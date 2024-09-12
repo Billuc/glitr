@@ -14,7 +14,7 @@ links = [{ title = "Website", href = "https://hexdocs.pm/glitr_lustre" }]
 
 [dependencies]
 gleam_stdlib = ">= 0.34.0 and < 2.0.0"
-glitr = { path = "../glitr" }
+glitr = ">= 0.1.0 and < 1.0.0"
 lustre_http = ">= 0.5.2 and < 1.0.0"
 lustre = ">= 4.4.3 and < 5.0.0"
 
