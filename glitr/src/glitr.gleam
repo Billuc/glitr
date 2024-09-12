@@ -1,6 +1,5 @@
 import gleam/dynamic
 import gleam/http
-import gleam/io
 import gleam/json
 
 pub type JsonEncoder(a) =
