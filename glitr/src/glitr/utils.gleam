@@ -22,13 +22,18 @@ pub fn id_path_converter(root: List(String)) -> glitr.PathConverter(String) {
   })
 }
 
+pub fn no_query_converter() -> glitr.QueryConverter(Nil) {
+  glitr.QueryConverter(fn(_) { [] }, fn(_) { Ok(Nil) })
+}
+
 pub fn no_body_converter() -> glitr.JsonConverter(Nil) {
   glitr.JsonConverter(fn(_) { json.null() }, fn(_) { Ok(Nil) })
 }
 
 pub fn to_request(
-  route: glitr.Route(p, rqb, rsb),
+  route: glitr.Route(p, q, rqb, rsb),
   path: p,
+  query: q,
   body: rqb,
 ) -> request.Request(String) {
   let req =
@@ -40,6 +45,7 @@ pub fn to_request(
     |> request.set_path(
       path |> route.path_converter.encoder |> string.join("/"),
     )
+    |> request.set_query(query |> route.query_converter.encoder)
 
   case route.has_body {
     True ->

@@ -11,18 +11,14 @@ pub type Router {
   Router(req: wisp.Request)
 }
 
-pub type RouteOptions(p, b) {
-  RouteOptions(path: p, body: b)
-}
-
 pub fn for(req: wisp.Request) -> Result(Router, wisp.Response) {
   Ok(Router(req))
 }
 
 pub fn try(
   router_res: Result(Router, wisp.Response),
-  route: glitr.Route(p, b, res),
-  handler: fn(RouteOptions(p, b)) -> Result(res, errors.AppError),
+  route: glitr.Route(p, q, b, res),
+  handler: fn(glitr.RouteOptions(p, q, b)) -> Result(res, errors.AppError),
 ) -> Result(Router, wisp.Response) {
   use router <- result.try(router_res)
 
@@ -30,6 +26,22 @@ pub fn try(
 
   case result {
     Ok(response) -> Error(response)
+    Error(Nil) -> Ok(router)
+  }
+}
+
+pub fn try_map(
+  router_res: Result(Router, wisp.Response),
+  route: glitr.Route(p, q, b, res),
+  handler: fn(glitr.RouteOptions(p, q, b)) -> Result(res, errors.AppError),
+  map_fn: fn(wisp.Response) -> wisp.Response,
+) -> Result(Router, wisp.Response) {
+  use router <- result.try(router_res)
+
+  let result = receive(router.req, route, handler)
+
+  case result {
+    Ok(response) -> Error(response |> map_fn)
     Error(Nil) -> Ok(router)
   }
 }
@@ -43,16 +55,17 @@ pub fn unwrap(router_res: Result(Router, wisp.Response)) -> wisp.Response {
 
 fn receive(
   req: wisp.Request,
-  route: glitr.Route(p, b, res),
-  handler: fn(RouteOptions(p, b)) -> Result(res, errors.AppError),
+  route: glitr.Route(p, q, b, res),
+  handler: fn(glitr.RouteOptions(p, q, b)) -> Result(res, errors.AppError),
 ) -> Result(wisp.Response, Nil) {
   use <- bool.guard(req.method != route.method, Error(Nil))
   use path <- handle_path(req, route)
+  use query <- handle_query(req, route)
   use body <- handle_body(req, route)
 
   use <- handle_result
 
-  let result = handler(RouteOptions(path, body))
+  let result = handler(glitr.RouteOptions(path, query, body))
   result
   |> result.map(route.res_body_converter.encoder)
   |> result.map(json.to_string_builder)
@@ -60,22 +73,35 @@ fn receive(
 
 fn handle_path(
   req: wisp.Request,
-  route: glitr.Route(p, _, _),
-  callback: fn(p) -> wisp.Response,
+  route: glitr.Route(p, _, _, _),
+  callback: fn(p) -> Result(wisp.Response, Nil),
 ) -> Result(wisp.Response, Nil) {
   let path_result = req |> wisp.path_segments |> route.path_converter.decoder
 
   case path_result {
-    Ok(path) -> Ok(callback(path))
+    Ok(path) -> callback(path)
+    Error(_) -> Error(Nil)
+  }
+}
+
+fn handle_query(
+  req: wisp.Request,
+  route: glitr.Route(_, q, _, _),
+  callback: fn(q) -> Result(wisp.Response, Nil),
+) -> Result(wisp.Response, Nil) {
+  let path_result = req |> wisp.get_query |> route.query_converter.decoder
+
+  case path_result {
+    Ok(path) -> callback(path)
     Error(_) -> Error(Nil)
   }
 }
 
 fn handle_body(
   req: wisp.Request,
-  route: glitr.Route(_, b, _),
+  route: glitr.Route(_, _, b, _),
   callback: fn(b) -> wisp.Response,
-) -> wisp.Response {
+) -> Result(wisp.Response, Nil) {
   let call_callback = fn(res) {
     case res {
       Ok(value) -> callback(value)
@@ -85,8 +111,9 @@ fn handle_body(
     }
   }
 
-  case route.has_body {
-    False -> call_callback(route.req_body_converter.decoder(dynamic.from(Nil)))
+  let body = case route.has_body {
+    False ->
+      dynamic.from(Nil) |> route.req_body_converter.decoder |> call_callback
     True -> {
       use json <- wisp.require_json(req)
       json
@@ -94,6 +121,7 @@ fn handle_body(
       |> call_callback
     }
   }
+  Ok(body)
 }
 
 fn handle_result(
@@ -106,6 +134,8 @@ fn handle_result(
     Error(errors.DecoderError(msg)) ->
       wisp.json_response(string_builder.from_string(msg), 400)
     Error(errors.DBError(msg)) ->
+      wisp.json_response(string_builder.from_string(msg), 500)
+    Error(errors.InternalError(msg)) ->
       wisp.json_response(string_builder.from_string(msg), 500)
   }
 }

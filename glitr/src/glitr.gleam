@@ -22,7 +22,17 @@ pub type PathConverter(a) {
   PathConverter(encoder: PathEncoder(a), decoder: PathDecoder(a))
 }
 
-pub type Route(path_type, req_body_type, res_body_type) {
+pub type QueryEncoder(a) =
+  fn(a) -> List(#(String, String))
+
+pub type QueryDecoder(a) =
+  fn(List(#(String, String))) -> Result(a, Nil)
+
+pub type QueryConverter(a) {
+  QueryConverter(encoder: QueryEncoder(a), decoder: QueryDecoder(a))
+}
+
+pub type Route(path_type, query_type, req_body_type, res_body_type) {
   Route(
     method: http.Method,
     scheme: http.Scheme,
@@ -30,7 +40,12 @@ pub type Route(path_type, req_body_type, res_body_type) {
     port: Int,
     has_body: Bool,
     path_converter: PathConverter(path_type),
+    query_converter: QueryConverter(query_type),
     req_body_converter: JsonConverter(req_body_type),
     res_body_converter: JsonConverter(res_body_type),
   )
+}
+
+pub type RouteOptions(p, q, b) {
+  RouteOptions(path: p, query: q, body: b)
 }
