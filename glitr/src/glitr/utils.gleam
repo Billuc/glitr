@@ -6,6 +6,8 @@ import glitr/path
 import glitr/query
 import glitr/route
 
+/// Converts a Route to a HTTP request by providing the path, query and request body data
+/// This function is actually not used in the library, it stays there in case one needs it
 pub fn to_request(
   route: route.Route(p, q, rqb, rsb),
   path: p,

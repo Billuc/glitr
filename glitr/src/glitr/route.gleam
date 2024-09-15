@@ -1,8 +1,14 @@
+//// This module exports the Route type and builder functions
+//// Routes correspond to endpoints on a backend that will be called from a frontend
+//// They are defined by a method, a path, a query and request/response bodies
+
 import gleam/http
 import glitr/body
 import glitr/path
 import glitr/query
 
+/// The Route type
+/// Routes should be built using the builder functions
 pub type Route(path_type, query_type, req_body_type, res_body_type) {
   Route(
     method: http.Method,
@@ -13,6 +19,8 @@ pub type Route(path_type, query_type, req_body_type, res_body_type) {
   )
 }
 
+/// Create a new Route
+/// By default the method is GET and the path, query and bodies are empty
 pub fn new() -> Route(Nil, Nil, Nil, Nil) {
   Route(
     http.Get,
@@ -23,6 +31,7 @@ pub fn new() -> Route(Nil, Nil, Nil, Nil) {
   )
 }
 
+/// Change the method of a Route
 pub fn with_method(
   route: Route(p, q, b, c),
   method: http.Method,
@@ -30,6 +39,7 @@ pub fn with_method(
   Route(..route, method: method)
 }
 
+/// Change the path of a Route
 pub fn with_path(
   route: Route(p, q, b, c),
   path: path.RoutePath(p2),
@@ -43,6 +53,7 @@ pub fn with_path(
   )
 }
 
+/// Change the query of a Route
 pub fn with_query(
   route: Route(p, q, b, c),
   query: query.RouteQuery(q2),
@@ -56,6 +67,7 @@ pub fn with_query(
   )
 }
 
+/// Change the request body of a Route
 pub fn with_request_body(
   route: Route(p, q, b, c),
   req_body: body.RouteBody(b2),
@@ -69,6 +81,7 @@ pub fn with_request_body(
   )
 }
 
+/// Change the response body of a Route
 pub fn with_response_body(
   route: Route(p, q, b, c),
   res_body: body.RouteBody(c2),

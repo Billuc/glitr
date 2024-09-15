@@ -1,3 +1,5 @@
+//// This module helps you create standard CRUD services routes
+
 import gleam/dynamic
 import gleam/http
 import gleam/json
@@ -7,6 +9,9 @@ import glitr/error
 import glitr/path
 import glitr/route
 
+/// The RouteService type
+/// Contains the data necessary to build the CRUD routes
+/// Note that all data transmission will be done via JSON objects
 pub type RouteService(base_type, upsert_type) {
   RouteService(
     root_path: List(String),
@@ -25,10 +30,13 @@ pub type RouteService(base_type, upsert_type) {
   )
 }
 
+/// Create a new empty service
+/// The base and upsert types will have to be specified
 pub fn new() -> RouteService(_, _) {
   RouteService([], None, None)
 }
 
+/// Change the root path of a service
 pub fn with_root_path(
   service: RouteService(_, _),
   root_path: List(String),
@@ -36,6 +44,8 @@ pub fn with_root_path(
   RouteService(..service, root_path: root_path)
 }
 
+/// Specify the base type of a service by providing a JSON encoder & decoder
+/// The base type of a service represent the type of object your service is associated with
 pub fn with_base_type(
   service: RouteService(_, _),
   base_encoder: fn(base_type) -> json.Json,
@@ -49,6 +59,8 @@ pub fn with_base_type(
   )
 }
 
+/// Specify the upsert type of a service by providing a JSON encoder & decoder
+/// The upsert type of a service represent the type used to create or update objects of your service
 pub fn with_upsert_type(
   service: RouteService(_, _),
   upsert_encoder: fn(upsert_type) -> json.Json,
@@ -62,6 +74,7 @@ pub fn with_upsert_type(
   )
 }
 
+/// Generate a create route associated with a service
 pub fn create_route(
   service: RouteService(base_type, upsert_type),
 ) -> Result(route.Route(Nil, Nil, upsert_type, base_type), error.GlitrError) {
@@ -85,6 +98,7 @@ pub fn create_route(
   }
 }
 
+/// Generate a get-all route associated with a service
 pub fn get_all_route(
   service: RouteService(base_type, upsert_type),
 ) -> Result(route.Route(Nil, Nil, Nil, List(base_type)), error.GlitrError) {
@@ -106,6 +120,7 @@ pub fn get_all_route(
   }
 }
 
+/// Generate a get route associated with a service
 pub fn get_route(
   service: RouteService(base_type, upsert_type),
 ) -> Result(route.Route(String, Nil, Nil, base_type), error.GlitrError) {
@@ -124,6 +139,7 @@ pub fn get_route(
   }
 }
 
+/// Generate a update route associated with a service
 pub fn update_route(
   service: RouteService(base_type, upsert_type),
 ) -> Result(route.Route(String, Nil, upsert_type, base_type), error.GlitrError) {
@@ -147,6 +163,8 @@ pub fn update_route(
   }
 }
 
+/// Generate a delete route associated with a service
+/// Note that the return is the id of the deleted instance
 pub fn delete_route(
   service: RouteService(base_type, upsert_type),
 ) -> Result(route.Route(String, Nil, Nil, String), error.GlitrError) {

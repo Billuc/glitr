@@ -10,7 +10,10 @@ gleam add glitr
 ```
 ```gleam
 import glitr
-import glitr/utils
+import glitr/body
+import glitr/route
+import glitr/path
+import glitr_lustre
 import gleam/json
 import gleam/dynamic
 import gleam/http
@@ -38,24 +41,21 @@ fn decoder(
 }
 
 pub fn main() {
-  let todo_converter = glitr.JsonConverter(encoder, decoder)
-  let get_all_todos_route = glitr.Route(
-    http.Get,
-    http.Http,
-    "localhost",
-    2345,
-    False,
-    utils.simple_path_converter(["todos"]),
-    utils.no_body_converter(),
-    todo_converter
-  )
+  let get_all_todos_route = route.new()
+    |> with_path(path.static_path(["todos"]))
+    |> with_response_body(body.json_body(encoder, decoder))
 
   // This route can be shared and used by both frontend and backend applications
 
-  // Here is an example for a frontend application
-  let request = get_all_todos_route |> utils.to_request(Nil, Nil)
-
-  // Use request as you wish (with glitr_lustre for example)
+  // Here is an example for a frontend lustre application using glitr_lustre
+  glitr_lustre.create_factory()
+    |> glitr_lustre.with_port(2345)
+    |> glitr_lustre.for_route(get_all_todos_route)
+    |> glitr_lustre.with_path(Nil) // For now, this is necessary
+    |> glitr_lustr.send(
+      fn(todos) { ServerSentTodos(todos) }, // ServerSentTodos is a Lustre message
+      fn(_err) { effect.none() } // This is for error handling
+    )
 }
 ```
 
