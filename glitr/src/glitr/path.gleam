@@ -14,7 +14,7 @@ pub type PathType {
   ComplexPath
 }
 
-/// A wrapper for an encoder and a decoder to convert from request/response path to and from a Gleam type
+/// A wrapper for an encoder and a decoder to convert from request/response path to and from a Gleam type  
 /// The decoder should return Error(Nil) if the input path doesn't correspond to the expected pattern
 pub type PathConverter(path_type) {
   PathConverter(

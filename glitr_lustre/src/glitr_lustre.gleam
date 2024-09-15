@@ -1,3 +1,5 @@
+//// This module helps to make the bridge between glitr Routes and lustre
+
 import gleam/http
 import gleam/http/request
 import gleam/option.{type Option, None, Some}
@@ -13,14 +15,21 @@ import glitr/route
 import lustre/effect
 import lustre_http
 
-pub type RequestFactory {
+pub opaque type RequestFactory {
+  /// A request factory helps you create requests automatically from routes.  
+  /// It contains data on the way to reach the backend (scheme, host and port).
+  /// It is meant to be reusable as usually one frontend connects mainly to one backend
   RequestFactory(scheme: http.Scheme, host: String, port: Int)
 }
 
+/// Create a new default factory  
+/// By default, it points to "http://localhost:80"
 pub fn create_factory() -> RequestFactory {
   RequestFactory(http.Http, "localhost", 80)
 }
 
+/// Changes the scheme of a RequestFactory  
+/// Also sets the port to the default for the selected scheme (80 for http and 443 for https)
 pub fn with_scheme(
   factory: RequestFactory,
   scheme: http.Scheme,
@@ -31,14 +40,17 @@ pub fn with_scheme(
   }
 }
 
+/// Changes the host of a RequestFactory
 pub fn with_host(factory: RequestFactory, host: String) -> RequestFactory {
   RequestFactory(..factory, host: host)
 }
 
+/// Changes the port of a RequestFactory
 pub fn with_port(factory: RequestFactory, port: Int) -> RequestFactory {
   RequestFactory(..factory, port: port)
 }
 
+/// Create a RouteRequest given a RequestFactory and a Route
 pub fn for_route(
   factory: RequestFactory,
   route: route.Route(p, q, b, c),
@@ -54,7 +66,10 @@ pub fn for_route(
   )
 }
 
-pub type RouteRequest(p, q, b, c) {
+/// A RouteRequest contains the data required to send a request to a backend  
+/// This data contains a route, all the data from the factory that created the request
+/// as well as path, query and body data that will have to be provided
+pub opaque type RouteRequest(p, q, b, c) {
   RouteRequest(
     route: route.Route(p, q, b, c),
     scheme: http.Scheme,
@@ -66,6 +81,7 @@ pub type RouteRequest(p, q, b, c) {
   )
 }
 
+/// Set the path, query and body data all at the same time
 pub fn with_options(
   request: RouteRequest(p, q, b, _),
   options: glitr.RouteOptions(p, q, b),
@@ -78,6 +94,8 @@ pub fn with_options(
   )
 }
 
+/// Set the path data for this request  
+/// Note that, for now, you have to call this method before sending the request
 pub fn with_path(
   request: RouteRequest(p, _, _, _),
   path: p,
@@ -85,6 +103,7 @@ pub fn with_path(
   RouteRequest(..request, path_opt: Some(path))
 }
 
+/// Set the query data for this request
 pub fn with_query(
   request: RouteRequest(_, q, _, _),
   query: q,
@@ -92,6 +111,7 @@ pub fn with_query(
   RouteRequest(..request, query_opt: Some(query))
 }
 
+/// Set the body data for this request
 pub fn with_body(
   request: RouteRequest(_, _, b, _),
   body: b,
@@ -99,6 +119,8 @@ pub fn with_body(
   RouteRequest(..request, body_opt: Some(body))
 }
 
+/// Send a RouteRequest and handle the result  
+/// Uses lustre_http under the hood to send the result, catch the response and transform the data
 pub fn send(
   rreq: RouteRequest(p, q, b, c),
   as_msg: fn(Result(c, lustre_http.HttpError)) -> msg,
@@ -132,6 +154,9 @@ pub fn send(
   )
 }
 
+/// Set the path of the request based on data stored in the RouteRequest  
+/// It is meant to be used with use and provides the request with the path set.
+/// It will call on_error if no path data is provided.
 fn add_path(
   req: request.Request(String),
   rreq: RouteRequest(p, q, b, c),
@@ -151,6 +176,9 @@ fn add_path(
   }
 }
 
+/// Set the query of the request based on data stored in the RouteRequest  
+/// It is meant to be used with use and provides the request with the query set.
+/// It will call on_error if no query data is provided and is required.
 fn add_query(
   req: request.Request(String),
   rreq: RouteRequest(p, q, b, c),
@@ -166,6 +194,9 @@ fn add_query(
   }
 }
 
+/// Set the body of the request based on data stored in the RouteRequest  
+/// It is meant to be used with use and provides the request with the body set.
+/// It will call on_error if no body data is provided and is required.
 fn add_body(
   req: request.Request(String),
   rreq: RouteRequest(p, q, b, c),
@@ -194,6 +225,7 @@ fn add_body(
   }
 }
 
+/// Mapper function between GlitrError and HttpError
 fn glitr_to_http_error(err: error.GlitrError) -> lustre_http.HttpError {
   case err {
     error.RouteError(msg) -> lustre_http.OtherError(500, msg)

@@ -9,9 +9,9 @@ import glitr/error
 import glitr/path
 import glitr/route
 
-/// The RouteService type
-/// Contains the data necessary to build the CRUD routes
-/// Note that all data transmission will be done via JSON objects
+/// The RouteService type  
+/// Contains the data necessary to build the CRUD routes.
+/// Note that all data transmission will be done via JSON objects.
 pub type RouteService(base_type, upsert_type) {
   RouteService(
     root_path: List(String),
@@ -30,8 +30,8 @@ pub type RouteService(base_type, upsert_type) {
   )
 }
 
-/// Create a new empty service
-/// The base and upsert types will have to be specified
+/// Create a new empty service  
+/// The base and upsert types will have to be specified !
 pub fn new() -> RouteService(_, _) {
   RouteService([], None, None)
 }
@@ -44,7 +44,7 @@ pub fn with_root_path(
   RouteService(..service, root_path: root_path)
 }
 
-/// Specify the base type of a service by providing a JSON encoder & decoder
+/// Specify the base type of a service by providing a JSON encoder & decoder  
 /// The base type of a service represent the type of object your service is associated with
 pub fn with_base_type(
   service: RouteService(_, _),
@@ -59,7 +59,7 @@ pub fn with_base_type(
   )
 }
 
-/// Specify the upsert type of a service by providing a JSON encoder & decoder
+/// Specify the upsert type of a service by providing a JSON encoder & decoder  
 /// The upsert type of a service represent the type used to create or update objects of your service
 pub fn with_upsert_type(
   service: RouteService(_, _),
@@ -163,7 +163,7 @@ pub fn update_route(
   }
 }
 
-/// Generate a delete route associated with a service
+/// Generate a delete route associated with a service  
 /// Note that the return is the id of the deleted instance
 pub fn delete_route(
   service: RouteService(base_type, upsert_type),

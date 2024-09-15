@@ -1,13 +1,13 @@
-//// This module exports the Route type and builder functions
-//// Routes correspond to endpoints on a backend that will be called from a frontend
-//// They are defined by a method, a path, a query and request/response bodies
+//// This module exports the Route type and builder functions.  
+//// Routes correspond to endpoints on a backend that will be called from a frontend.
+//// They are defined by a method, a path, a query and request/response bodies.
 
 import gleam/http
 import glitr/body
 import glitr/path
 import glitr/query
 
-/// The Route type
+/// The Route type  
 /// Routes should be built using the builder functions
 pub type Route(path_type, query_type, req_body_type, res_body_type) {
   Route(
@@ -19,7 +19,7 @@ pub type Route(path_type, query_type, req_body_type, res_body_type) {
   )
 }
 
-/// Create a new Route
+/// Create a new Route  
 /// By default the method is GET and the path, query and bodies are empty
 pub fn new() -> Route(Nil, Nil, Nil, Nil) {
   Route(
