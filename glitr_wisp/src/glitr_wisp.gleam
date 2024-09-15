@@ -1,9 +1,12 @@
 import gleam/bool
-import gleam/dynamic
-import gleam/json
+import gleam/list
 import gleam/result
 import gleam/string_builder
 import glitr
+import glitr/body
+import glitr/path
+import glitr/query
+import glitr/route
 import glitr_wisp/errors
 import wisp
 
@@ -17,7 +20,7 @@ pub fn for(req: wisp.Request) -> Result(Router, wisp.Response) {
 
 pub fn try(
   router_res: Result(Router, wisp.Response),
-  route: glitr.Route(p, q, b, res),
+  route: route.Route(p, q, b, res),
   handler: fn(glitr.RouteOptions(p, q, b)) -> Result(res, errors.AppError),
 ) -> Result(Router, wisp.Response) {
   use router <- result.try(router_res)
@@ -32,7 +35,7 @@ pub fn try(
 
 pub fn try_map(
   router_res: Result(Router, wisp.Response),
-  route: glitr.Route(p, q, b, res),
+  route: route.Route(p, q, b, res),
   handler: fn(glitr.RouteOptions(p, q, b)) -> Result(res, errors.AppError),
   map_fn: fn(wisp.Response) -> wisp.Response,
 ) -> Result(Router, wisp.Response) {
@@ -55,7 +58,7 @@ pub fn unwrap(router_res: Result(Router, wisp.Response)) -> wisp.Response {
 
 fn receive(
   req: wisp.Request,
-  route: glitr.Route(p, q, b, res),
+  route: route.Route(p, q, b, res),
   handler: fn(glitr.RouteOptions(p, q, b)) -> Result(res, errors.AppError),
 ) -> Result(wisp.Response, Nil) {
   use <- bool.guard(req.method != route.method, Error(Nil))
@@ -63,20 +66,17 @@ fn receive(
   use query <- handle_query(req, route)
   use body <- handle_body(req, route)
 
-  use <- handle_result
+  use <- handle_result(route)
 
-  let result = handler(glitr.RouteOptions(path, query, body))
-  result
-  |> result.map(route.res_body_converter.encoder)
-  |> result.map(json.to_string_builder)
+  handler(glitr.RouteOptions(path, query, body))
 }
 
 fn handle_path(
   req: wisp.Request,
-  route: glitr.Route(p, _, _, _),
+  route: route.Route(p, _, _, _),
   callback: fn(p) -> Result(wisp.Response, Nil),
 ) -> Result(wisp.Response, Nil) {
-  let path_result = req |> wisp.path_segments |> route.path_converter.decoder
+  let path_result = req |> wisp.path_segments |> path.decode(route.path, _)
 
   case path_result {
     Ok(path) -> callback(path)
@@ -86,10 +86,10 @@ fn handle_path(
 
 fn handle_query(
   req: wisp.Request,
-  route: glitr.Route(_, q, _, _),
+  route: route.Route(_, q, _, _),
   callback: fn(q) -> Result(wisp.Response, Nil),
 ) -> Result(wisp.Response, Nil) {
-  let path_result = req |> wisp.get_query |> route.query_converter.decoder
+  let path_result = req |> wisp.get_query |> query.decode(route.query, _)
 
   case path_result {
     Ok(path) -> callback(path)
@@ -99,7 +99,7 @@ fn handle_query(
 
 fn handle_body(
   req: wisp.Request,
-  route: glitr.Route(_, _, b, _),
+  route: route.Route(_, _, b, _),
   callback: fn(b) -> wisp.Response,
 ) -> Result(wisp.Response, Nil) {
   let call_callback = fn(res) {
@@ -111,13 +111,22 @@ fn handle_body(
     }
   }
 
-  let body = case route.has_body {
-    False ->
-      dynamic.from(Nil) |> route.req_body_converter.decoder |> call_callback
-    True -> {
-      use json <- wisp.require_json(req)
-      json
-      |> route.req_body_converter.decoder
+  let body = case route.req_body |> body.get_type {
+    body.EmptyBody -> route.req_body |> body.decode("") |> call_callback
+    body.JsonBody -> {
+      use value <- wisp.require_string_body(req)
+      use <- bool.guard(
+        req.headers |> list.key_find("content-type") != Ok("application/json"),
+        wisp.unsupported_media_type(["application/json"]),
+      )
+      route.req_body
+      |> body.decode(value)
+      |> call_callback
+    }
+    body.StringBody -> {
+      use value <- wisp.require_string_body(req)
+      route.req_body
+      |> body.decode(value)
       |> call_callback
     }
   }
@@ -125,17 +134,34 @@ fn handle_body(
 }
 
 fn handle_result(
-  handler: fn() -> Result(string_builder.StringBuilder, errors.AppError),
+  route: route.Route(_, _, _, res),
+  handler: fn() -> Result(res, errors.AppError),
 ) -> wisp.Response {
   let result = handler()
 
   case result {
-    Ok(res) -> wisp.json_response(res, 200)
     Error(errors.DecoderError(msg)) ->
-      wisp.json_response(string_builder.from_string(msg), 400)
+      wisp.bad_request()
+      |> wisp.set_body(wisp.Text(string_builder.from_string(msg)))
     Error(errors.DBError(msg)) ->
-      wisp.json_response(string_builder.from_string(msg), 500)
+      wisp.internal_server_error()
+      |> wisp.set_body(wisp.Text(string_builder.from_string(msg)))
     Error(errors.InternalError(msg)) ->
-      wisp.json_response(string_builder.from_string(msg), 500)
+      wisp.internal_server_error()
+      |> wisp.set_body(wisp.Text(string_builder.from_string(msg)))
+    Ok(res) ->
+      case route.res_body |> body.get_type {
+        body.JsonBody ->
+          route.res_body
+          |> body.encode(res)
+          |> wisp.json_response(200)
+        body.StringBody ->
+          wisp.ok()
+          |> wisp.set_body(wisp.Text(
+            route.res_body
+            |> body.encode(res),
+          ))
+        body.EmptyBody -> wisp.ok()
+      }
   }
 }

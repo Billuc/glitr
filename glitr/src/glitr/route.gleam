@@ -1,120 +1,83 @@
 import gleam/http
-import glitr
-import glitr/utils
+import glitr/body
+import glitr/path
+import glitr/query
 
-pub fn new() -> glitr.Route(Nil, Nil, Nil, Nil) {
-  glitr.Route(
+pub type Route(path_type, query_type, req_body_type, res_body_type) {
+  Route(
+    method: http.Method,
+    path: path.RoutePath(path_type),
+    query: query.RouteQuery(query_type),
+    req_body: body.RouteBody(req_body_type),
+    res_body: body.RouteBody(res_body_type),
+  )
+}
+
+pub fn new() -> Route(Nil, Nil, Nil, Nil) {
+  Route(
     http.Get,
-    http.Http,
-    "localhost",
-    80,
-    False,
-    utils.simple_path_converter([]),
-    utils.no_query_converter(),
-    utils.no_body_converter(),
-    utils.no_body_converter(),
+    path.static_path([]),
+    query.empty_query(),
+    body.empty_body(),
+    body.empty_body(),
   )
 }
 
 pub fn with_method(
-  route: glitr.Route(p, q, b, c),
+  route: Route(p, q, b, c),
   method: http.Method,
-) -> glitr.Route(p, q, b, c) {
-  glitr.Route(..route, method: method)
+) -> Route(p, q, b, c) {
+  Route(..route, method: method)
 }
 
-pub fn with_scheme(
-  route: glitr.Route(p, q, b, c),
-  scheme: http.Scheme,
-) -> glitr.Route(p, q, b, c) {
-  glitr.Route(..route, scheme: scheme)
-}
-
-pub fn with_host(
-  route: glitr.Route(p, q, b, c),
-  host: String,
-) -> glitr.Route(p, q, b, c) {
-  glitr.Route(..route, host: host)
-}
-
-pub fn with_port(
-  route: glitr.Route(p, q, b, c),
-  port: Int,
-) -> glitr.Route(p, q, b, c) {
-  glitr.Route(..route, port: port)
-}
-
-pub fn with_has_body(
-  route: glitr.Route(p, q, b, c),
-  has_body: Bool,
-) -> glitr.Route(p, q, b, c) {
-  glitr.Route(..route, has_body: has_body)
-}
-
-pub fn with_path_converter(
-  route: glitr.Route(p, q, b, c),
-  path_converter: glitr.PathConverter(p2),
-) -> glitr.Route(p2, q, b, c) {
-  glitr.Route(
+pub fn with_path(
+  route: Route(p, q, b, c),
+  path: path.RoutePath(p2),
+) -> Route(p2, q, b, c) {
+  Route(
     method: route.method,
-    scheme: route.scheme,
-    host: route.host,
-    port: route.port,
-    has_body: route.has_body,
-    path_converter: path_converter,
-    query_converter: route.query_converter,
-    req_body_converter: route.req_body_converter,
-    res_body_converter: route.res_body_converter,
+    path: path,
+    query: route.query,
+    req_body: route.req_body,
+    res_body: route.res_body,
   )
 }
 
-pub fn with_query_converter(
-  route: glitr.Route(p, q, b, c),
-  query_converter: glitr.QueryConverter(q2),
-) -> glitr.Route(p, q2, b, c) {
-  glitr.Route(
+pub fn with_query(
+  route: Route(p, q, b, c),
+  query: query.RouteQuery(q2),
+) -> Route(p, q2, b, c) {
+  Route(
     method: route.method,
-    scheme: route.scheme,
-    host: route.host,
-    port: route.port,
-    has_body: route.has_body,
-    path_converter: route.path_converter,
-    query_converter: query_converter,
-    req_body_converter: route.req_body_converter,
-    res_body_converter: route.res_body_converter,
+    path: route.path,
+    query: query,
+    req_body: route.req_body,
+    res_body: route.res_body,
   )
 }
 
-pub fn with_request_body_converter(
-  route: glitr.Route(p, q, b, c),
-  req_body_converter: glitr.JsonConverter(b2),
-) -> glitr.Route(p, q, b2, c) {
-  glitr.Route(
+pub fn with_request_body(
+  route: Route(p, q, b, c),
+  req_body: body.RouteBody(b2),
+) -> Route(p, q, b2, c) {
+  Route(
     method: route.method,
-    scheme: route.scheme,
-    host: route.host,
-    port: route.port,
-    has_body: route.has_body,
-    path_converter: route.path_converter,
-    query_converter: route.query_converter,
-    req_body_converter: req_body_converter,
-    res_body_converter: route.res_body_converter,
+    path: route.path,
+    query: route.query,
+    req_body: req_body,
+    res_body: route.res_body,
   )
 }
 
-pub fn with_response_body_converter(
-  route: glitr.Route(p, q, b, c),
-  res_body_converter: glitr.JsonConverter(c2),
-) -> glitr.Route(p, q, b, c2) {
-  glitr.Route(
+pub fn with_response_body(
+  route: Route(p, q, b, c),
+  res_body: body.RouteBody(c2),
+) -> Route(p, q, b, c2) {
+  Route(
     method: route.method,
-    scheme: route.scheme,
-    host: route.host,
-    port: route.port,
-    has_body: route.has_body,
-    path_converter: route.path_converter,
-    query_converter: route.query_converter,
-    req_body_converter: route.req_body_converter,
-    res_body_converter: res_body_converter,
+    path: route.path,
+    query: route.query,
+    req_body: route.req_body,
+    res_body: res_body,
   )
 }

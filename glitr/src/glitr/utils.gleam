@@ -1,37 +1,13 @@
-import gleam/bool
 import gleam/http/request
-import gleam/json
-import gleam/list
 import gleam/string
-import glitr
-
-pub fn simple_path_converter(root: List(String)) -> glitr.PathConverter(Nil) {
-  glitr.PathConverter(fn(_) { root }, fn(segs) {
-    use <- bool.guard(segs == root, Ok(Nil))
-    Error(Nil)
-  })
-}
-
-pub fn id_path_converter(root: List(String)) -> glitr.PathConverter(String) {
-  glitr.PathConverter(fn(id) { list.append(root, [id]) }, fn(segs) {
-    let reverse_root = list.reverse(root)
-    case list.reverse(segs) {
-      [id, ..rest] if rest == reverse_root -> Ok(id)
-      _ -> Error(Nil)
-    }
-  })
-}
-
-pub fn no_query_converter() -> glitr.QueryConverter(Nil) {
-  glitr.QueryConverter(fn(_) { [] }, fn(_) { Ok(Nil) })
-}
-
-pub fn no_body_converter() -> glitr.JsonConverter(Nil) {
-  glitr.JsonConverter(fn(_) { json.null() }, fn(_) { Ok(Nil) })
-}
+import gleam/string_builder
+import glitr/body
+import glitr/path
+import glitr/query
+import glitr/route
 
 pub fn to_request(
-  route: glitr.Route(p, q, rqb, rsb),
+  route: route.Route(p, q, rqb, rsb),
   path: p,
   query: q,
   body: rqb,
@@ -39,21 +15,18 @@ pub fn to_request(
   let req =
     request.new()
     |> request.set_method(route.method)
-    |> request.set_scheme(route.scheme)
-    |> request.set_host(route.host)
-    |> request.set_port(route.port)
-    |> request.set_path(
-      path |> route.path_converter.encoder |> string.join("/"),
+    |> request.set_path(route.path |> path.encode(path) |> string.join("/"))
+    |> request.set_query(route.query |> query.encode(query))
+    |> request.set_body(
+      route.req_body |> body.encode(body) |> string_builder.to_string,
     )
-    |> request.set_query(query |> route.query_converter.encoder)
 
-  case route.has_body {
-    True ->
+  let req = case route.req_body |> body.get_type {
+    body.JsonBody ->
       req
-      |> request.set_body(
-        body |> route.req_body_converter.encoder |> json.to_string,
-      )
       |> request.set_header("Content-Type", "application/json")
-    False -> req
+    _ -> req
   }
+
+  req
 }

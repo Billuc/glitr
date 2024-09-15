@@ -1,3 +1,4 @@
+import gleam/json
 import gleeunit
 import gleeunit/should
 
@@ -9,4 +10,10 @@ pub fn main() {
 pub fn hello_world_test() {
   1
   |> should.equal(1)
+}
+
+pub fn json_test() {
+  ""
+  |> json.decode(fn(_) { Ok(Nil) })
+  |> should.equal(Ok(Nil))
 }

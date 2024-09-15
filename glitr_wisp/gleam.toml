@@ -16,7 +16,8 @@ links = [{ title = "Website", href = "https://hexdocs.pm/glitr_wisp" }]
 gleam_stdlib = ">= 0.34.0 and < 2.0.0"
 wisp = ">= 1.1.0 and < 2.0.0"
 gleam_json = ">= 1.0.1 and < 2.0.0"
-glitr = ">= 0.1.2 and < 1.0.0"
+# glitr = ">= 0.1.2 and < 1.0.0"
+glitr = { path = "../glitr" }
 
 [dev-dependencies]
 gleeunit = ">= 1.0.0 and < 2.0.0"
