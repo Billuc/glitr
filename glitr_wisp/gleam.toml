@@ -1,5 +1,5 @@
 name = "glitr_wisp"
-version = "0.1.2"
+version = "0.1.5"
 
 # Fill out these fields if you intend to generate HTML documentation or publish
 # your project to the Hex package manager.
@@ -16,8 +16,8 @@ links = [{ title = "Website", href = "https://hexdocs.pm/glitr_wisp" }]
 gleam_stdlib = ">= 0.34.0 and < 2.0.0"
 wisp = ">= 1.1.0 and < 2.0.0"
 gleam_json = ">= 1.0.1 and < 2.0.0"
-# glitr = ">= 0.1.2 and < 1.0.0"
-glitr = { path = "../glitr" }
+glitr = ">= 0.1.5 and < 1.0.0"
+# glitr = { path = "../glitr" }
 
 [dev-dependencies]
 gleeunit = ">= 1.0.0 and < 2.0.0"
