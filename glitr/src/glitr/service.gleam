@@ -4,10 +4,12 @@ import gleam/dynamic
 import gleam/http
 import gleam/json
 import gleam/option.{type Option, None, Some}
+import gleam/result
 import glitr/body
 import glitr/error
 import glitr/path
 import glitr/route
+import glitr_convert/converter
 
 /// The RouteService type  
 /// Contains the data necessary to build the CRUD routes.
@@ -59,6 +61,25 @@ pub fn with_base_type(
   )
 }
 
+/// Specify the base type of a service by providing a glitr_convert type  
+/// The base type of a service represent the type of object your service is associated with
+pub fn with_base_type_converter(
+  service: RouteService(_, _),
+  converter: converter.Converter(base_type),
+) -> RouteService(base_type, _) {
+  RouteService(
+    service.root_path,
+    Some(#(
+      fn(val) {
+        converter |> converter.json_encode(val) |> result.unwrap(json.null())
+        // Defaulting to null for now (should never happen though)
+      },
+      fn(val) { converter |> converter.json_decode(val) },
+    )),
+    service.upsert,
+  )
+}
+
 /// Specify the upsert type of a service by providing a JSON encoder & decoder  
 /// The upsert type of a service represent the type used to create or update objects of your service
 pub fn with_upsert_type(
@@ -71,6 +92,25 @@ pub fn with_upsert_type(
     service.root_path,
     service.base,
     Some(#(upsert_encoder, upsert_decoder)),
+  )
+}
+
+/// Specify the upsert type of a service by providing a glitr_convert type    
+/// The upsert type of a service represent the type used to create or update objects of your service
+pub fn with_upsert_type_converter(
+  service: RouteService(_, _),
+  converter: converter.Converter(upsert_type),
+) -> RouteService(_, upsert_type) {
+  RouteService(
+    service.root_path,
+    service.base,
+    Some(#(
+      fn(val) {
+        converter |> converter.json_encode(val) |> result.unwrap(json.null())
+        // Defaulting to null for now (should never happen though)
+      },
+      fn(val) { converter |> converter.json_decode(val) },
+    )),
   )
 }
 
