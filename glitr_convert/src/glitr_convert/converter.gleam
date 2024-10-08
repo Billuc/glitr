@@ -7,6 +7,8 @@ import gleam/result
 import gleam/string
 import glitr_convert.{type GlitrType, type GlitrValue}
 
+/// A converter is an object with the data necessary to encode and decode a specific Gleam type.  
+/// You can build converters using the provided constructors.
 pub opaque type Converter(a) {
   Converter(
     encoder: fn(a) -> GlitrValue,
@@ -15,11 +17,15 @@ pub opaque type Converter(a) {
   )
 }
 
+/// This is an intermediary type to build converters for a custom Gleam type.  
+/// TODO: rename
 pub opaque type ObjectConverter(current, base) {
   ObjectConverter(constructor: fn() -> base)
   ObjectWithParameterConverter(constructor: fn(current) -> base)
 }
 
+/// This is an intermediary type to build converters for a custom Gleam type.  
+/// TODO: rename
 pub opaque type ObjectWithFieldConverter(current, base) {
   ObjectWithFieldConverter(
     encoder: fn(base, current) -> GlitrValue,
@@ -28,6 +34,25 @@ pub opaque type ObjectWithFieldConverter(current, base) {
   )
 }
 
+/// Build a converter for a custom Gleam type.
+/// 
+/// Example: 
+/// ```
+/// type Person {
+///   Person(name: String, age: Int)
+/// }
+/// 
+/// let converter = object({
+///   use name <- parameter
+///   use age <- parameter
+///   use <- constructor
+/// 
+///   Person(name:, age:)
+/// })
+/// |> field("name", fn(v) { Ok(v.name) }, string())
+/// |> field("age", fn(v) { Ok(v.age) }, int())
+/// |> to_converter
+/// ```
 pub fn object(
   object_converter: ObjectConverter(a, b),
 ) -> ObjectWithFieldConverter(a, b) {
@@ -43,6 +68,8 @@ pub fn object(
   )
 }
 
+/// Specify a new parameter to be used in an object converter.  
+/// See `object()`
 pub fn parameter(
   next: fn(a) -> ObjectConverter(b, c),
 ) -> ObjectConverter(#(a, b), c) {
@@ -54,10 +81,19 @@ pub fn parameter(
   })
 }
 
+/// Specify that the next instruction returns a constructed instance of the type to convert.  
+/// See `object()`
 pub fn constructor(c: fn() -> a) -> ObjectConverter(Nil, a) {
   ObjectConverter(c)
 }
 
+/// Provide information about the fields of an object converter. 
+///  
+/// `field_name` is the key that will be used in the encoded data.  
+/// `field_getter` is a function returning a way to access the field from an instance.  
+/// `field_type` is the converter to use for this field.  
+/// 
+/// See `object()` for an example.
 pub fn field(
   converter: ObjectWithFieldConverter(#(a, b), c),
   field_name: String,
@@ -111,6 +147,7 @@ pub fn field(
   )
 }
 
+/// Generate a converter from a builder type
 pub fn to_converter(converter: ObjectWithFieldConverter(Nil, a)) -> Converter(a) {
   Converter(
     encoder: converter.encoder(_, Nil),
@@ -119,6 +156,7 @@ pub fn to_converter(converter: ObjectWithFieldConverter(Nil, a)) -> Converter(a)
   )
 }
 
+/// Basic converter for a String value
 pub fn string() -> Converter(String) {
   Converter(
     fn(v: String) { glitr_convert.StringValue(v) },
@@ -133,6 +171,7 @@ pub fn string() -> Converter(String) {
   )
 }
 
+/// Basic converter for a Bool value
 pub fn bool() -> Converter(Bool) {
   Converter(
     fn(v: Bool) { glitr_convert.BoolValue(v) },
@@ -146,6 +185,7 @@ pub fn bool() -> Converter(Bool) {
   )
 }
 
+/// Basic converter for a Float value
 pub fn float() -> Converter(Float) {
   Converter(
     fn(v: Float) { glitr_convert.FloatValue(v) },
@@ -159,6 +199,7 @@ pub fn float() -> Converter(Float) {
   )
 }
 
+/// Basic converter for a Int value
 pub fn int() -> Converter(Int) {
   Converter(
     fn(v: Int) { glitr_convert.IntValue(v) },
@@ -172,6 +213,7 @@ pub fn int() -> Converter(Int) {
   )
 }
 
+/// Basic converter for a Nil value
 pub fn null() -> Converter(Nil) {
   Converter(
     fn(_: Nil) { glitr_convert.NullValue },
@@ -185,6 +227,9 @@ pub fn null() -> Converter(Nil) {
   )
 }
 
+/// Basic converter for a List value.   
+/// 
+/// `of` is a converter for the type of the elements.
 pub fn list(of: Converter(a)) -> Converter(List(a)) {
   Converter(
     fn(v: List(a)) { glitr_convert.ListValue(v |> list.map(of.encoder)) },
@@ -206,6 +251,9 @@ pub fn list(of: Converter(a)) -> Converter(List(a)) {
   )
 }
 
+/// Basic converter for a Option value.
+/// 
+/// `of` is a converter for the optional value.
 pub fn optional(of: Converter(a)) -> Converter(option.Option(a)) {
   Converter(
     fn(v: option.Option(a)) {
@@ -224,6 +272,10 @@ pub fn optional(of: Converter(a)) -> Converter(option.Option(a)) {
   )
 }
 
+/// Basic converter for a Result value.
+/// 
+/// `res` is a converter for the Ok value.
+/// `error` is a converter for the Error value.
 pub fn result(
   res: Converter(ok),
   error: Converter(err),
@@ -248,6 +300,15 @@ pub fn result(
   )
 }
 
+/// Basic converter for a Dict value.
+/// 
+/// `key` is a converter for the keys.
+/// `value` is a converter for the values.
+/// 
+/// Example:
+/// ```
+/// let converter: Converter(Dict(String, Int)) = dict(string(), int())
+/// ```
 pub fn dict(
   key: Converter(k),
   value: Converter(v),
@@ -290,6 +351,57 @@ pub fn dict(
   )
 }
 
+/// Create a converter for an enum type
+/// 
+/// `tags` is a function that associate a tag to each variant of the enum
+/// `converters` is a list of converters, each associated with a tag
+/// 
+/// Example:
+/// ```
+/// type Action {
+///   Open(id: String)
+///   Close(id: String)
+/// }
+/// 
+/// let open_converter = object({
+///   use id <- parameter
+///   use <- constructor
+///   Open(id:)
+/// })
+/// |> field("id", fn(v) {
+///   case v {
+///     Open(id) -> Ok(id)
+///     _ -> Error(Nil)
+///   }
+/// })
+/// |> to_converter
+/// 
+/// let close_converter = object({
+///   use id <- parameter
+///   use <- constructor
+///   Close(id:)
+/// })
+/// |> field("id", fn(v) {
+///   case v {
+///     Close(id) -> Ok(id)
+///     _ -> Error(Nil)
+///   }
+/// })
+/// |> to_converter
+/// 
+/// let action_converter = enum(
+///   fn(v) {
+///     case v {
+///       Open(_) -> "Open"
+///       Close(_) -> "Close"
+///     }
+///   },
+///   [
+///     #("Open", open_converter),
+///     #("Close", close_converter),
+///   ]
+/// )
+/// ```
 pub fn enum(
   tags: fn(a) -> String,
   converters: List(#(String, Converter(a))),
@@ -345,22 +457,19 @@ fn get_type(val: GlitrValue) -> String {
   }
 }
 
-pub fn encode(
-  converter: Converter(a),
-  value: a,
-) -> Result(GlitrValue, List(dynamic.DecodeError)) {
-  value |> converter.encoder |> Ok
+/// Encode a value into the corresponding GlitrValue using the converter.  
+/// If the converter isn't valid, a NullValue is returned.
+pub fn encode(converter: Converter(a), value: a) -> GlitrValue {
+  value |> converter.encoder
 }
 
-pub fn json_encode(
-  converter: Converter(a),
-  value: a,
-) -> Result(json.Json, List(dynamic.DecodeError)) {
-  use glitr_value <- result.map(converter |> encode(value))
-
-  glitr_convert.json_encode(glitr_value)
+/// Encode a value into the corresponding Json using the converter.  
+/// If the converter isn't valid, a NullValue is returned.
+pub fn json_encode(converter: Converter(a), value: a) -> json.Json {
+  converter |> encode(value) |> glitr_convert.json_encode
 }
 
+/// Decode a GlitrValue using the provided converter.
 pub fn decode(
   converter: Converter(a),
   value: GlitrValue,
@@ -368,6 +477,7 @@ pub fn decode(
   value |> converter.decoder
 }
 
+/// Decode a Json value using the provided converter.
 pub fn json_decode(
   converter: Converter(a),
   value: dynamic.Dynamic,

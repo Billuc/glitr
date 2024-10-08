@@ -6,6 +6,9 @@ import gleam/option
 import gleam/result
 import gleam/string
 
+/// This type is used to define the shape of the data.  
+/// It isn't meant to be used directly !  
+/// It is better to use converters that use GlitrTypes internally to decode data.
 pub type GlitrType {
   String
   Bool
@@ -21,6 +24,9 @@ pub type GlitrType {
   // Maybe add BitArray
 }
 
+/// This type is used to represent data values.  
+/// It is an intermediate type between encoded data and Gleam types.
+/// It isn't meant to be used directly !  
 pub type GlitrValue {
   StringValue(value: String)
   BoolValue(value: Bool)
@@ -35,6 +41,9 @@ pub type GlitrValue {
   EnumValue(variant: String, value: GlitrValue)
 }
 
+/// Encode a GlitrValue into its corresponding JSON representation.  
+/// This is not meant to be used directly !  
+/// It is better to use converters.
 pub fn json_encode(val: GlitrValue) -> json.Json {
   case val {
     StringValue(v) -> json.string(v)
@@ -71,6 +80,9 @@ pub fn json_encode(val: GlitrValue) -> json.Json {
   }
 }
 
+/// Decode a JSON value using the specified GlitrType as the shape of the data.  
+/// Returns the corresponding GlitrValue representation.
+/// This isn't meant to be used directly !
 pub fn json_decode(
   of: GlitrType,
 ) -> fn(dynamic.Dynamic) -> Result(GlitrValue, List(dynamic.DecodeError)) {

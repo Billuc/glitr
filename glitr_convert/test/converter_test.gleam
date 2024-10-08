@@ -22,7 +22,6 @@ pub fn simple_object_encode_test() {
 
   test_converter
   |> converter.encode(TestType("hello", 78))
-  |> should.be_ok
   |> should.equal(
     glitr_convert.ObjectValue([
       #("a", glitr_convert.StringValue("hello")),
@@ -91,7 +90,6 @@ pub fn complex_type_encode_test() {
     ["Adam", "Bob", "Carmen", "Dorothy"],
     TestType("Grade", 15),
   ))
-  |> should.be_ok
   |> should.equal(
     glitr_convert.ObjectValue([
       #(
