@@ -18,15 +18,15 @@ pub opaque type Converter(a) {
 
 /// This is an intermediary type to build converters for a custom Gleam type.  
 /// TODO: rename
-pub opaque type ObjectConverter(current, base) {
-  ObjectConverter(constructor: fn() -> base)
-  ObjectWithParameterConverter(constructor: fn(current) -> base)
+pub opaque type ObjectDefinition(current, base) {
+  ObjectDefinition(constructor: fn() -> base)
+  ObjectParameterDefinition(constructor: fn(current) -> base)
 }
 
 /// This is an intermediary type to build converters for a custom Gleam type.  
 /// TODO: rename
-pub opaque type ObjectWithFieldConverter(current, base) {
-  ObjectWithFieldConverter(
+pub opaque type ObjectConverterBuilder(current, base) {
+  ObjectConverterBuilder(
     encoder: fn(base, current) -> GlitrValue,
     decoder: fn(GlitrValue, current) -> Result(base, List(dynamic.DecodeError)),
     type_def: GlitrType,
@@ -53,14 +53,14 @@ pub opaque type ObjectWithFieldConverter(current, base) {
 /// |> to_converter
 /// ```
 pub fn object(
-  object_converter: ObjectConverter(a, b),
-) -> ObjectWithFieldConverter(a, b) {
-  ObjectWithFieldConverter(
+  object_converter: ObjectDefinition(a, b),
+) -> ObjectConverterBuilder(a, b) {
+  ObjectConverterBuilder(
     fn(_, _) { glitr_convert.ObjectValue([]) },
     fn(_, curr) {
       case object_converter {
-        ObjectConverter(constructor) -> Ok(constructor())
-        ObjectWithParameterConverter(constructor) -> Ok(constructor(curr))
+        ObjectDefinition(constructor) -> Ok(constructor())
+        ObjectParameterDefinition(constructor) -> Ok(constructor(curr))
       }
     },
     glitr_convert.Object([]),
@@ -70,20 +70,20 @@ pub fn object(
 /// Specify a new parameter to be used in an object converter.  
 /// See `object()`
 pub fn parameter(
-  next: fn(a) -> ObjectConverter(b, c),
-) -> ObjectConverter(#(a, b), c) {
-  ObjectWithParameterConverter(fn(v: #(a, b)) {
+  next: fn(a) -> ObjectDefinition(b, c),
+) -> ObjectDefinition(#(a, b), c) {
+  ObjectParameterDefinition(fn(v: #(a, b)) {
     case next(v.0) {
-      ObjectConverter(constructor) -> constructor()
-      ObjectWithParameterConverter(constructor) -> constructor(v.1)
+      ObjectDefinition(constructor) -> constructor()
+      ObjectParameterDefinition(constructor) -> constructor(v.1)
     }
   })
 }
 
 /// Specify that the next instruction returns a constructed instance of the type to convert.  
 /// See `object()`
-pub fn constructor(c: fn() -> a) -> ObjectConverter(Nil, a) {
-  ObjectConverter(c)
+pub fn constructor(c: fn() -> a) -> ObjectDefinition(Nil, a) {
+  ObjectDefinition(c)
 }
 
 /// Provide information about the fields of an object converter. 
@@ -94,12 +94,12 @@ pub fn constructor(c: fn() -> a) -> ObjectConverter(Nil, a) {
 /// 
 /// See `object()` for an example.
 pub fn field(
-  converter: ObjectWithFieldConverter(#(a, b), c),
+  converter: ObjectConverterBuilder(#(a, b), c),
   field_name: String,
   field_getter: fn(c) -> Result(a, Nil),
   field_type: Converter(a),
-) -> ObjectWithFieldConverter(b, c) {
-  ObjectWithFieldConverter(
+) -> ObjectConverterBuilder(b, c) {
+  ObjectConverterBuilder(
     encoder: fn(base: c, curr: b) {
       let value = field_getter(base)
 
@@ -147,7 +147,7 @@ pub fn field(
 }
 
 /// Generate a converter from a builder type
-pub fn to_converter(converter: ObjectWithFieldConverter(Nil, a)) -> Converter(a) {
+pub fn to_converter(converter: ObjectConverterBuilder(Nil, a)) -> Converter(a) {
   Converter(
     encoder: converter.encoder(_, Nil),
     decoder: converter.decoder(_, Nil),
