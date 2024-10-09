@@ -1,6 +1,5 @@
 import gleam/dict
 import gleam/dynamic
-import gleam/json
 import gleam/list
 import gleam/option
 import gleam/result
@@ -459,30 +458,17 @@ fn get_type(val: GlitrValue) -> String {
 
 /// Encode a value into the corresponding GlitrValue using the converter.  
 /// If the converter isn't valid, a NullValue is returned.
-pub fn encode(converter: Converter(a), value: a) -> GlitrValue {
-  value |> converter.encoder
-}
-
-/// Encode a value into the corresponding Json using the converter.  
-/// If the converter isn't valid, a NullValue is returned.
-pub fn json_encode(converter: Converter(a), value: a) -> json.Json {
-  converter |> encode(value) |> glitr_convert.json_encode
+pub fn encode(converter: Converter(a)) -> fn(a) -> GlitrValue {
+  converter.encoder
 }
 
 /// Decode a GlitrValue using the provided converter.
 pub fn decode(
   converter: Converter(a),
-  value: GlitrValue,
-) -> Result(a, List(dynamic.DecodeError)) {
-  value |> converter.decoder
+) -> fn(GlitrValue) -> Result(a, List(dynamic.DecodeError)) {
+  converter.decoder
 }
 
-/// Decode a Json value using the provided converter.
-pub fn json_decode(
-  converter: Converter(a),
-  value: dynamic.Dynamic,
-) -> Result(a, List(dynamic.DecodeError)) {
-  value
-  |> glitr_convert.json_decode(converter.type_def)
-  |> result.then(converter.decoder)
+pub fn type_def(converter: Converter(a)) -> GlitrType {
+  converter.type_def
 }
