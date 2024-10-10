@@ -1,11 +1,9 @@
 import gleam/bool
-import gleam/io
 import gleam/list
 import gleam/result
 import gleam/string_builder
 import glitr
 import glitr/body
-import glitr/error
 import glitr/path
 import glitr/query
 import glitr/route
@@ -57,39 +55,6 @@ pub fn try_map(
   case result {
     Ok(response) -> Error(response |> map_fn)
     Error(Nil) -> Ok(router)
-  }
-}
-
-/// Do the same as try, but take a Result(Route, GlitrError) as a parameter  
-/// If the route is an Error, a log is printed and the route is ignored
-pub fn try_service_route(
-  router_res: Result(Router, wisp.Response),
-  route: Result(route.Route(p, q, b, c), error.GlitrError),
-  handler: fn(glitr.RouteOptions(p, q, b)) -> Result(c, errors.AppError),
-) -> Result(Router, wisp.Response) {
-  case route {
-    Ok(r) -> router_res |> try(r, handler)
-    Error(err) -> {
-      io.debug(err)
-      router_res
-    }
-  }
-}
-
-/// Do the same as try_map, but take a Result(Route, GlitrError) as a parameter  
-/// If the route is an Error, a log is printed and the route is ignored
-pub fn try_map_service_route(
-  router_res: Result(Router, wisp.Response),
-  route: Result(route.Route(p, q, b, c), error.GlitrError),
-  handler: fn(glitr.RouteOptions(p, q, b)) -> Result(c, errors.AppError),
-  map_fn: fn(wisp.Response) -> wisp.Response,
-) -> Result(Router, wisp.Response) {
-  case route {
-    Ok(r) -> router_res |> try_map(r, handler, map_fn)
-    Error(err) -> {
-      io.debug(err)
-      router_res
-    }
   }
 }
 
