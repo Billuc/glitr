@@ -3,11 +3,6 @@
 import gleam/bool
 import gleam/list
 
-// pub type PathType(path_type) {
-//   StaticPath(path: List(String))
-//   ComplexPath(converter: PathConverter(path_type))
-// }
-
 /// The type of path that can be expected from a Route
 pub type PathType {
   StaticPath

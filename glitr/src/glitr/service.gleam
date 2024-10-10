@@ -1,15 +1,60 @@
 //// This module helps you create standard CRUD services routes
+//// 
+//// Example : 
+//// ```
+//// import glitr/service
+//// import glitr/convert
+//// 
+//// pub type Todo {
+////  Todo(id: String, title: String)
+//// }
+//// 
+//// pub type UpsertTodo {
+////  UpsertTodo(title: String)
+//// }
+//// 
+//// pub fn todo_converter() -> convert.Converter(Todo) {
+////  convert.object({
+////    use id <- convert.parameter
+////    use title <- convert.parameter
+////    use <- convert.constructor
+////    Todo(id:, title:)
+////  })
+////  |> convert.field("id", fn(v) { v.id }, convert.string())
+////  |> convert.field("title", fn(v) { v.title }, convert.string())
+////  |> convert.to_converter()
+//// }
+//// 
+//// pub fn upsert_todo_converter() -> convert.Converter(UpsertTodo) {
+////  convert.object({
+////    use title <- convert.parameter
+////    use <- convert.constructor
+////    UpsertTodo(title:)
+////  })
+////  |> convert.field("title", fn(v) { v.title }, convert.string())
+////  |> convert.to_converter()
+//// }
+//// 
+//// pub fn todo_service() -> service.RouteService(Todo, UpsertTodo) {
+////  service.new()
+////  |> service.with_root_path(["todos"])
+////  |> service.with_base_converter(todo_converter())
+////  |> service.with_upsert_converter(upsert_todo_converter())
+//// }
+//// 
+//// pub fn create_todo_route() {
+////  todo_service() |> service.create_route()
+//// }
+//// ```
 
 import gleam/dynamic
 import gleam/http
 import gleam/json
-import gleam/option.{type Option, None, Some}
-import gleam/result
 import glitr/body
-import glitr/error
+import glitr/convert
+import glitr/convert/json as glitr_json
 import glitr/path
 import glitr/route
-import glitr_convert/converter
 
 /// The RouteService type  
 /// Contains the data necessary to build the CRUD routes.
@@ -17,25 +62,25 @@ import glitr_convert/converter
 pub type RouteService(base_type, upsert_type) {
   RouteService(
     root_path: List(String),
-    base: Option(
-      #(
-        fn(base_type) -> json.Json,
-        fn(dynamic.Dynamic) -> Result(base_type, List(dynamic.DecodeError)),
-      ),
+    base: #(
+      fn(base_type) -> json.Json,
+      fn(dynamic.Dynamic) -> Result(base_type, List(dynamic.DecodeError)),
     ),
-    upsert: Option(
-      #(
-        fn(upsert_type) -> json.Json,
-        fn(dynamic.Dynamic) -> Result(upsert_type, List(dynamic.DecodeError)),
-      ),
+    upsert: #(
+      fn(upsert_type) -> json.Json,
+      fn(dynamic.Dynamic) -> Result(upsert_type, List(dynamic.DecodeError)),
     ),
   )
 }
 
+fn nil_converter() {
+  #(fn(_) { json.null() }, fn(_) { Ok(Nil) })
+}
+
 /// Create a new empty service  
 /// The base and upsert types will have to be specified !
-pub fn new() -> RouteService(_, _) {
-  RouteService([], None, None)
+pub fn new() -> RouteService(Nil, Nil) {
+  RouteService([], nil_converter(), nil_converter())
 }
 
 /// Change the root path of a service
@@ -54,28 +99,21 @@ pub fn with_base_type(
   base_decoder: fn(dynamic.Dynamic) ->
     Result(base_type, List(dynamic.DecodeError)),
 ) -> RouteService(base_type, _) {
-  RouteService(
-    service.root_path,
-    Some(#(base_encoder, base_decoder)),
-    service.upsert,
-  )
+  RouteService(service.root_path, #(base_encoder, base_decoder), service.upsert)
 }
 
 /// Specify the base type of a service by providing a glitr_convert type  
 /// The base type of a service represent the type of object your service is associated with
-pub fn with_base_type_converter(
+pub fn with_base_converter(
   service: RouteService(_, _),
-  converter: converter.Converter(base_type),
+  converter: convert.Converter(base_type),
 ) -> RouteService(base_type, _) {
   RouteService(
     service.root_path,
-    Some(#(
-      fn(val) {
-        converter |> converter.json_encode(val) |> result.unwrap(json.null())
-        // Defaulting to null for now (should never happen though)
-      },
-      fn(val) { converter |> converter.json_decode(val) },
-    )),
+    #(
+      fn(val) { val |> glitr_json.json_encode(converter) },
+      glitr_json.json_decode(converter),
+    ),
     service.upsert,
   )
 }
@@ -88,129 +126,76 @@ pub fn with_upsert_type(
   upsert_decoder: fn(dynamic.Dynamic) ->
     Result(upsert_type, List(dynamic.DecodeError)),
 ) -> RouteService(_, upsert_type) {
-  RouteService(
-    service.root_path,
-    service.base,
-    Some(#(upsert_encoder, upsert_decoder)),
-  )
+  RouteService(service.root_path, service.base, #(
+    upsert_encoder,
+    upsert_decoder,
+  ))
 }
 
 /// Specify the upsert type of a service by providing a glitr_convert type    
 /// The upsert type of a service represent the type used to create or update objects of your service
-pub fn with_upsert_type_converter(
+pub fn with_upsert_converter(
   service: RouteService(_, _),
-  converter: converter.Converter(upsert_type),
+  converter: convert.Converter(upsert_type),
 ) -> RouteService(_, upsert_type) {
-  RouteService(
-    service.root_path,
-    service.base,
-    Some(#(
-      fn(val) {
-        converter |> converter.json_encode(val) |> result.unwrap(json.null())
-        // Defaulting to null for now (should never happen though)
-      },
-      fn(val) { converter |> converter.json_decode(val) },
-    )),
-  )
+  RouteService(service.root_path, service.base, #(
+    fn(val) { val |> glitr_json.json_encode(converter) },
+    glitr_json.json_decode(converter),
+  ))
 }
 
 /// Generate a create route associated with a service
 pub fn create_route(
   service: RouteService(base_type, upsert_type),
-) -> Result(route.Route(Nil, Nil, upsert_type, base_type), error.GlitrError) {
-  case service.upsert, service.base {
-    None, _ ->
-      Error(error.RouteError(
-        "No upsert type provided, make sure you called with_upsert_type",
-      ))
-    _, None ->
-      Error(error.RouteError(
-        "No base type provided, make sure you called with_base_type",
-      ))
-    Some(upsert), Some(base) -> {
-      route.new()
-      |> route.with_method(http.Post)
-      |> route.with_path(path.static_path(service.root_path))
-      |> route.with_request_body(body.json_body(upsert.0, upsert.1))
-      |> route.with_response_body(body.json_body(base.0, base.1))
-      |> Ok
-    }
-  }
+) -> route.Route(Nil, Nil, upsert_type, base_type) {
+  route.new()
+  |> route.with_method(http.Post)
+  |> route.with_path(path.static_path(service.root_path))
+  |> route.with_request_body(body.json_body(service.upsert.0, service.upsert.1))
+  |> route.with_response_body(body.json_body(service.base.0, service.base.1))
 }
 
 /// Generate a get-all route associated with a service
 pub fn get_all_route(
   service: RouteService(base_type, upsert_type),
-) -> Result(route.Route(Nil, Nil, Nil, List(base_type)), error.GlitrError) {
-  case service.base {
-    None ->
-      Error(error.RouteError(
-        "No base type provided, make sure you called with_base_type",
-      ))
-    Some(base) -> {
-      route.new()
-      |> route.with_method(http.Get)
-      |> route.with_path(path.static_path(service.root_path))
-      |> route.with_response_body(body.json_body(
-        fn(v) { v |> json.array(base.0) },
-        dynamic.list(base.1),
-      ))
-      |> Ok
-    }
-  }
+) -> route.Route(Nil, Nil, Nil, List(base_type)) {
+  route.new()
+  |> route.with_method(http.Get)
+  |> route.with_path(path.static_path(service.root_path))
+  |> route.with_response_body(body.json_body(
+    fn(v) { v |> json.array(service.base.0) },
+    dynamic.list(service.base.1),
+  ))
 }
 
 /// Generate a get route associated with a service
 pub fn get_route(
   service: RouteService(base_type, upsert_type),
-) -> Result(route.Route(String, Nil, Nil, base_type), error.GlitrError) {
-  case service.base {
-    None ->
-      Error(error.RouteError(
-        "No base body type provided, make sure you called with_base_type",
-      ))
-    Some(base) -> {
-      route.new()
-      |> route.with_method(http.Get)
-      |> route.with_path(path.id_path(service.root_path))
-      |> route.with_response_body(body.json_body(base.0, base.1))
-      |> Ok
-    }
-  }
+) -> route.Route(String, Nil, Nil, base_type) {
+  route.new()
+  |> route.with_method(http.Get)
+  |> route.with_path(path.id_path(service.root_path))
+  |> route.with_response_body(body.json_body(service.base.0, service.base.1))
 }
 
 /// Generate a update route associated with a service
 pub fn update_route(
   service: RouteService(base_type, upsert_type),
-) -> Result(route.Route(String, Nil, upsert_type, base_type), error.GlitrError) {
-  case service.upsert, service.base {
-    None, _ ->
-      Error(error.RouteError(
-        "No upsert body type provided, make sure you called with_upsert_type",
-      ))
-    _, None ->
-      Error(error.RouteError(
-        "No base body type provided, make sure you called with_base_type",
-      ))
-    Some(upsert), Some(base) -> {
-      route.new()
-      |> route.with_method(http.Post)
-      |> route.with_path(path.id_path(service.root_path))
-      |> route.with_request_body(body.json_body(upsert.0, upsert.1))
-      |> route.with_response_body(body.json_body(base.0, base.1))
-      |> Ok
-    }
-  }
+) -> route.Route(String, Nil, upsert_type, base_type) {
+  route.new()
+  |> route.with_method(http.Post)
+  |> route.with_path(path.id_path(service.root_path))
+  |> route.with_request_body(body.json_body(service.upsert.0, service.upsert.1))
+  |> route.with_response_body(body.json_body(service.base.0, service.base.1))
 }
 
 /// Generate a delete route associated with a service  
 /// Note that the return is the id of the deleted instance
 pub fn delete_route(
   service: RouteService(base_type, upsert_type),
-) -> Result(route.Route(String, Nil, Nil, String), error.GlitrError) {
+) -> route.Route(String, Nil, Nil, String) {
   route.new()
   |> route.with_method(http.Delete)
   |> route.with_path(path.id_path(service.root_path))
   |> route.with_response_body(body.json_body(json.string, dynamic.string))
-  |> Ok
 }

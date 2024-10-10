@@ -1,13 +1,18 @@
 # glitr
 
-Gleam typed routes library for type-safe fullstack development
-
 [![Package Version](https://img.shields.io/hexpm/v/glitr)](https://hex.pm/packages/glitr)
 [![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/glitr/)
+
+**Gleam typed routes library for type-safe fullstack development**
+
+## Installation
 
 ```sh
 gleam add glitr
 ```
+
+## Usage
+
 ```gleam
 import glitr
 import glitr/body
@@ -59,7 +64,14 @@ pub fn main() {
 }
 ```
 
+See also the `glitr/service` module for easy route definitions.
+
 Further documentation can be found at <https://hexdocs.pm/glitr>.
+
+## Features
+
+- Route definitions that can be shared to any target (Erlang and Javascript)
+- Full type support
 
 ## Development
 

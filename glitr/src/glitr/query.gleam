@@ -1,10 +1,5 @@
 //// This module exports types and functions related to the query of Routes
 
-// pub type QueryType(query_type) {
-//   EmptyQuery
-//   ComplexQuery(converter: QueryConverter(query_type))
-// }
-
 /// The type of query that can be expected from a Route
 pub type QueryType {
   EmptyQuery

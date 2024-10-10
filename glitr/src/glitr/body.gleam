@@ -6,11 +6,6 @@ import gleam/result
 import gleam/string_builder
 import glitr/error
 
-// pub type BodyType(body_type) {
-//   EmptyBody
-//   JsonBody(converter: JsonConverter(body_type))
-// }
-
 /// The type of body that can be expected from a Route
 pub type BodyType {
   EmptyBody

@@ -63,6 +63,7 @@ Further documentation can be found at <https://hexdocs.pm/glitr_convert>.
 ## Potential developments
 
 - Add BitArray support
+- Add Tuple support
 - Add Yaml conversion
 
 Feel free to open PRs and issues if you want more features !
