@@ -16,31 +16,36 @@ gleam add glitr_convert
 ## Usage
 
 ```gleam
-import glitr_convert/converter as c
+import gleam/io
 import gleam/json
+import glitr_convert/converters as c
+import glitr_convert/json as glitr_json
 
-type Person {
+pub type Person {
   Person(name: String, age: Int)
 }
 
 pub fn main() {
-  let converter = c.object({
-    use name <- c.parameter
-    use age <- c.parameter
-    use <- c.constructor
-    Person(name:, age:)
-  })
-  |> field("name", fn(v) { Ok(v.name) }, c.string())
-  |> field("age", fn(v) { Ok(v.age) }, c.int())
-  |> c.to_converter
+  let converter =
+    c.object({
+      use name <- c.parameter
+      use age <- c.parameter
+      use <- c.constructor
+      Person(name:, age:)
+    })
+    |> c.field("name", fn(v) { Ok(v.name) }, c.string())
+    |> c.field("age", fn(v) { Ok(v.age) }, c.int())
+    |> c.to_converter
 
   converter
-  |> c.json_encode(Person("Anna", 21))
+  |> glitr_json.json_encode(Person("Anna", 21), _)
   |> json.to_string
+  |> io.debug
   // '{"name": "Anna", "age": 21}'
 
   "{\"name\": \"Bob\", \"age\": 36}"
-  |> json.decode(c.json_decode(converter, _))
+  |> json.decode(glitr_json.json_decode(converter))
+  |> io.debug
   // Ok(Person("Bob", 36))
 }
 ```
