@@ -18,8 +18,8 @@ gleam add glitr_convert
 ```gleam
 import gleam/io
 import gleam/json
-import glitr_convert/converters as c
-import glitr_convert/json as glitr_json
+import glitr/convert as c
+import glitr/convert/json as glitr_json
 
 pub type Person {
   Person(name: String, age: Int)
@@ -37,8 +37,8 @@ pub fn main() {
     |> c.field("age", fn(v) { Ok(v.age) }, c.int())
     |> c.to_converter
 
-  converter
-  |> glitr_json.json_encode(Person("Anna", 21), _)
+  Person("Anna", 21)
+  |> glitr_json.json_encode(converter)
   |> json.to_string
   |> io.debug
   // '{"name": "Anna", "age": 21}'

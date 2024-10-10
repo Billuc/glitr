@@ -1,7 +1,7 @@
 import gleam/json
 import gleeunit/should
-import glitr_convert/converters as c
-import glitr_convert/json as j
+import glitr/convert as c
+import glitr/convert/json as j
 
 type TestType {
   TestType(a: String, b: Int)

@@ -4,8 +4,7 @@ import gleam/json
 import gleam/list
 import gleam/result
 import gleam/string
-import glitr_convert as g
-import glitr_convert/converters as c
+import glitr/convert as c
 
 /// Encode a value into the corresponding Json using the converter.  
 /// If the converter isn't valid, a NullValue is returned.
@@ -27,27 +26,27 @@ pub fn json_decode(
 /// Encode a GlitrValue into its corresponding JSON representation.  
 /// This is not meant to be used directly !  
 /// It is better to use converters.
-fn encode(val: g.GlitrValue) -> json.Json {
+fn encode(val: c.GlitrValue) -> json.Json {
   case val {
-    g.StringValue(v) -> json.string(v)
-    g.BoolValue(v) -> json.bool(v)
-    g.FloatValue(v) -> json.float(v)
-    g.IntValue(v) -> json.int(v)
-    g.ListValue(vals) -> json.array(vals, encode)
-    g.DictValue(v) ->
+    c.StringValue(v) -> json.string(v)
+    c.BoolValue(v) -> json.bool(v)
+    c.FloatValue(v) -> json.float(v)
+    c.IntValue(v) -> json.int(v)
+    c.ListValue(vals) -> json.array(vals, encode)
+    c.DictValue(v) ->
       json.array(v |> dict.to_list, fn(keyval) {
         json.array([keyval.0, keyval.1], encode)
       })
-    g.ObjectValue(v) -> json.object(list.map(v, fn(f) { #(f.0, encode(f.1)) }))
-    g.OptionalValue(v) -> json.nullable(v, encode)
-    g.ResultValue(v) ->
+    c.ObjectValue(v) -> json.object(list.map(v, fn(f) { #(f.0, encode(f.1)) }))
+    c.OptionalValue(v) -> json.nullable(v, encode)
+    c.ResultValue(v) ->
       case v {
         Ok(res) ->
           json.object([#("type", json.string("ok")), #("value", encode(res))])
         Error(err) ->
           json.object([#("type", json.string("error")), #("value", encode(err))])
       }
-    g.EnumValue(variant, v) ->
+    c.EnumValue(variant, v) ->
       json.object([#("variant", json.string(variant)), #("value", encode(v))])
     _ -> json.null()
   }
@@ -57,14 +56,14 @@ fn encode(val: g.GlitrValue) -> json.Json {
 /// Returns the corresponding GlitrValue representation.
 /// This isn't meant to be used directly !
 fn decode(
-  of: g.GlitrType,
-) -> fn(dynamic.Dynamic) -> Result(g.GlitrValue, List(dynamic.DecodeError)) {
+  of: c.GlitrType,
+) -> fn(dynamic.Dynamic) -> Result(c.GlitrValue, List(dynamic.DecodeError)) {
   case of {
-    g.String -> fn(val) { val |> dynamic.string() |> result.map(g.StringValue) }
-    g.Bool -> fn(val) { val |> dynamic.bool() |> result.map(g.BoolValue) }
-    g.Float -> fn(val) { val |> dynamic.float() |> result.map(g.FloatValue) }
-    g.Int -> fn(val) { val |> dynamic.int() |> result.map(g.IntValue) }
-    g.List(el) -> fn(val) {
+    c.String -> fn(val) { val |> dynamic.string() |> result.map(c.StringValue) }
+    c.Bool -> fn(val) { val |> dynamic.bool() |> result.map(c.BoolValue) }
+    c.Float -> fn(val) { val |> dynamic.float() |> result.map(c.FloatValue) }
+    c.Int -> fn(val) { val |> dynamic.int() |> result.map(c.IntValue) }
+    c.List(el) -> fn(val) {
       val
       |> dynamic.list(dynamic.dynamic)
       |> result.then(fn(val_list) {
@@ -84,9 +83,9 @@ fn decode(
         })
       })
       |> result.map(list.reverse)
-      |> result.map(g.ListValue)
+      |> result.map(c.ListValue)
     }
-    g.Dict(k, v) -> fn(val) {
+    c.Dict(k, v) -> fn(val) {
       val
       |> dynamic.list(of: dynamic.list(of: dynamic.any([decode(k), decode(v)])))
       |> result.then(list.fold(
@@ -104,9 +103,9 @@ fn decode(
         },
       ))
       |> result.map(dict.from_list)
-      |> result.map(g.DictValue)
+      |> result.map(c.DictValue)
     }
-    g.Object(fields) -> fn(val) {
+    c.Object(fields) -> fn(val) {
       list.fold(fields, Ok([]), fn(result, f) {
         case result {
           Ok(field_list) ->
@@ -122,12 +121,12 @@ fn decode(
         }
       })
       |> result.map(list.reverse)
-      |> result.map(g.ObjectValue)
+      |> result.map(c.ObjectValue)
     }
-    g.Optional(of) -> fn(val) {
-      val |> dynamic.optional(decode(of)) |> result.map(g.OptionalValue)
+    c.Optional(of) -> fn(val) {
+      val |> dynamic.optional(decode(of)) |> result.map(c.OptionalValue)
     }
-    g.Result(res, err) -> fn(val) {
+    c.Result(res, err) -> fn(val) {
       use type_val <- result.try(val |> dynamic.field("type", dynamic.string))
 
       case type_val {
@@ -135,17 +134,17 @@ fn decode(
           val
           |> dynamic.field("value", decode(res))
           |> result.map(Ok)
-          |> result.map(g.ResultValue)
+          |> result.map(c.ResultValue)
         "error" ->
           val
           |> dynamic.field("value", decode(err))
           |> result.map(Error)
-          |> result.map(g.ResultValue)
+          |> result.map(c.ResultValue)
         other -> Error([dynamic.DecodeError("ok or error", other, ["type"])])
         // TODO : better path
       }
     }
-    g.Enum(variants) -> fn(val) {
+    c.Enum(variants) -> fn(val) {
       use variant_name <- result.try(
         val |> dynamic.field("variant", dynamic.string),
       )
@@ -166,8 +165,8 @@ fn decode(
         |> result.then(decode(variant_def)),
       )
 
-      Ok(g.EnumValue(variant_name, variant_value))
+      Ok(c.EnumValue(variant_name, variant_value))
     }
-    _ -> fn(_val) { Ok(g.NullValue) }
+    _ -> fn(_val) { Ok(c.NullValue) }
   }
 }

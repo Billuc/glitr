@@ -1,6 +1,5 @@
 import gleeunit/should
-import glitr_convert
-import glitr_convert/converters as c
+import glitr/convert
 
 type TestType {
   TestType(a: String, b: Int)
@@ -8,23 +7,23 @@ type TestType {
 
 pub fn simple_object_encode_test() {
   let test_converter =
-    c.object({
-      use a <- c.parameter
-      use b <- c.parameter
-      use <- c.constructor
+    convert.object({
+      use a <- convert.parameter
+      use b <- convert.parameter
+      use <- convert.constructor
 
       TestType(a, b)
     })
-    |> c.field("a", fn(v) { Ok(v.a) }, c.string())
-    |> c.field("b", fn(v) { Ok(v.b) }, c.int())
-    |> c.to_converter
+    |> convert.field("a", fn(v) { Ok(v.a) }, convert.string())
+    |> convert.field("b", fn(v) { Ok(v.b) }, convert.int())
+    |> convert.to_converter
 
   TestType("hello", 78)
-  |> c.encode(test_converter)
+  |> convert.encode(test_converter)
   |> should.equal(
-    glitr_convert.ObjectValue([
-      #("a", glitr_convert.StringValue("hello")),
-      #("b", glitr_convert.IntValue(78)),
+    convert.ObjectValue([
+      #("a", convert.StringValue("hello")),
+      #("b", convert.IntValue(78)),
     ]),
   )
 }
@@ -35,48 +34,52 @@ type ComplexType {
 
 pub fn complex_type_encode_test() {
   let test_converter =
-    c.object({
-      use first <- c.parameter
-      use second <- c.parameter
-      use <- c.constructor
+    convert.object({
+      use first <- convert.parameter
+      use second <- convert.parameter
+      use <- convert.constructor
 
       ComplexType(first:, second:)
     })
-    |> c.field("first", fn(v) { Ok(v.first) }, c.list(c.string()))
-    |> c.field(
+    |> convert.field(
+      "first",
+      fn(v) { Ok(v.first) },
+      convert.list(convert.string()),
+    )
+    |> convert.field(
       "second",
       fn(v) { Ok(v.second) },
-      c.object({
-        use a <- c.parameter
-        use b <- c.parameter
-        use <- c.constructor
+      convert.object({
+        use a <- convert.parameter
+        use b <- convert.parameter
+        use <- convert.constructor
 
         TestType(a, b)
       })
-        |> c.field("a", fn(v) { Ok(v.a) }, c.string())
-        |> c.field("b", fn(v) { Ok(v.b) }, c.int())
-        |> c.to_converter,
+        |> convert.field("a", fn(v) { Ok(v.a) }, convert.string())
+        |> convert.field("b", fn(v) { Ok(v.b) }, convert.int())
+        |> convert.to_converter,
     )
-    |> c.to_converter
+    |> convert.to_converter
 
   ComplexType(["Adam", "Bob", "Carmen", "Dorothy"], TestType("Grade", 15))
-  |> c.encode(test_converter)
+  |> convert.encode(test_converter)
   |> should.equal(
-    glitr_convert.ObjectValue([
+    convert.ObjectValue([
       #(
         "first",
-        glitr_convert.ListValue([
-          glitr_convert.StringValue("Adam"),
-          glitr_convert.StringValue("Bob"),
-          glitr_convert.StringValue("Carmen"),
-          glitr_convert.StringValue("Dorothy"),
+        convert.ListValue([
+          convert.StringValue("Adam"),
+          convert.StringValue("Bob"),
+          convert.StringValue("Carmen"),
+          convert.StringValue("Dorothy"),
         ]),
       ),
       #(
         "second",
-        glitr_convert.ObjectValue([
-          #("a", glitr_convert.StringValue("Grade")),
-          #("b", glitr_convert.IntValue(15)),
+        convert.ObjectValue([
+          #("a", convert.StringValue("Grade")),
+          #("b", convert.IntValue(15)),
         ]),
       ),
     ]),

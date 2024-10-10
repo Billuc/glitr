@@ -4,7 +4,41 @@ import gleam/list
 import gleam/option
 import gleam/result
 import gleam/string
-import glitr_convert.{type GlitrType, type GlitrValue}
+
+/// This type is used to define the shape of the data.  
+/// It isn't meant to be used directly !  
+/// It is better to use converters that use GlitrTypes internally to decode data.
+pub type GlitrType {
+  String
+  Bool
+  Float
+  Int
+  Null
+  List(of: GlitrType)
+  Dict(key: GlitrType, value: GlitrType)
+  Object(fields: List(#(String, GlitrType)))
+  Optional(of: GlitrType)
+  Result(result: GlitrType, error: GlitrType)
+  Enum(variants: List(#(String, GlitrType)))
+  // Maybe add BitArray
+}
+
+/// This type is used to represent data values.  
+/// It is an intermediate type between encoded data and Gleam types.
+/// It isn't meant to be used directly !  
+pub type GlitrValue {
+  StringValue(value: String)
+  BoolValue(value: Bool)
+  FloatValue(value: Float)
+  IntValue(value: Int)
+  NullValue
+  ListValue(value: List(GlitrValue))
+  DictValue(value: dict.Dict(GlitrValue, GlitrValue))
+  ObjectValue(value: List(#(String, GlitrValue)))
+  OptionalValue(value: option.Option(GlitrValue))
+  ResultValue(value: Result(GlitrValue, GlitrValue))
+  EnumValue(variant: String, value: GlitrValue)
+}
 
 /// A converter is an object with the data necessary to encode and decode a specific Gleam type.  
 /// You can build converters using the provided constructors.
@@ -56,14 +90,14 @@ pub fn object(
   object_converter: ObjectDefinition(a, b),
 ) -> ObjectConverterBuilder(a, b) {
   ObjectConverterBuilder(
-    fn(_, _) { glitr_convert.ObjectValue([]) },
+    fn(_, _) { ObjectValue([]) },
     fn(_, curr) {
       case object_converter {
         ObjectDefinition(constructor) -> Ok(constructor())
         ObjectParameterDefinition(constructor) -> Ok(constructor(curr))
       }
     },
-    glitr_convert.Object([]),
+    Object([]),
   )
 }
 
@@ -104,23 +138,23 @@ pub fn field(
       let value = field_getter(base)
 
       case value {
-        Error(Nil) -> glitr_convert.NullValue
+        Error(Nil) -> NullValue
         Ok(field_value) -> {
           case converter.encoder(base, #(field_value, curr)) {
-            glitr_convert.ObjectValue(fields) ->
-              glitr_convert.ObjectValue(
+            ObjectValue(fields) ->
+              ObjectValue(
                 list.append(fields, [
                   #(field_name, field_type.encoder(field_value)),
                 ]),
               )
-            _ -> glitr_convert.NullValue
+            _ -> NullValue
           }
         }
       }
     },
     decoder: fn(v: GlitrValue, curr: b) {
       case v {
-        glitr_convert.ObjectValue(values) -> {
+        ObjectValue(values) -> {
           let field_value =
             values
             |> list.key_find(field_name)
@@ -137,11 +171,9 @@ pub fn field(
       }
     },
     type_def: case converter.type_def {
-      glitr_convert.Object(fields) ->
-        glitr_convert.Object(
-          list.append(fields, [#(field_name, field_type.type_def)]),
-        )
-      _ -> glitr_convert.Object([#(field_name, field_type.type_def)])
+      Object(fields) ->
+        Object(list.append(fields, [#(field_name, field_type.type_def)]))
+      _ -> Object([#(field_name, field_type.type_def)])
     },
   )
 }
@@ -158,71 +190,71 @@ pub fn to_converter(converter: ObjectConverterBuilder(Nil, a)) -> Converter(a) {
 /// Basic converter for a String value
 pub fn string() -> Converter(String) {
   Converter(
-    fn(v: String) { glitr_convert.StringValue(v) },
+    fn(v: String) { StringValue(v) },
     fn(v: GlitrValue) {
       case v {
-        glitr_convert.StringValue(val) -> Ok(val)
+        StringValue(val) -> Ok(val)
         other ->
           Error([dynamic.DecodeError("StringValue", get_type(other), [])])
       }
     },
-    glitr_convert.String,
+    String,
   )
 }
 
 /// Basic converter for a Bool value
 pub fn bool() -> Converter(Bool) {
   Converter(
-    fn(v: Bool) { glitr_convert.BoolValue(v) },
+    fn(v: Bool) { BoolValue(v) },
     fn(v: GlitrValue) {
       case v {
-        glitr_convert.BoolValue(val) -> Ok(val)
+        BoolValue(val) -> Ok(val)
         other -> Error([dynamic.DecodeError("BoolValue", get_type(other), [])])
       }
     },
-    glitr_convert.Bool,
+    Bool,
   )
 }
 
 /// Basic converter for a Float value
 pub fn float() -> Converter(Float) {
   Converter(
-    fn(v: Float) { glitr_convert.FloatValue(v) },
+    fn(v: Float) { FloatValue(v) },
     fn(v: GlitrValue) {
       case v {
-        glitr_convert.FloatValue(val) -> Ok(val)
+        FloatValue(val) -> Ok(val)
         other -> Error([dynamic.DecodeError("FloatValue", get_type(other), [])])
       }
     },
-    glitr_convert.Float,
+    Float,
   )
 }
 
 /// Basic converter for a Int value
 pub fn int() -> Converter(Int) {
   Converter(
-    fn(v: Int) { glitr_convert.IntValue(v) },
+    fn(v: Int) { IntValue(v) },
     fn(v: GlitrValue) {
       case v {
-        glitr_convert.IntValue(val) -> Ok(val)
+        IntValue(val) -> Ok(val)
         other -> Error([dynamic.DecodeError("IntValue", get_type(other), [])])
       }
     },
-    glitr_convert.Int,
+    Int,
   )
 }
 
 /// Basic converter for a Nil value
 pub fn null() -> Converter(Nil) {
   Converter(
-    fn(_: Nil) { glitr_convert.NullValue },
+    fn(_: Nil) { NullValue },
     fn(v: GlitrValue) {
       case v {
-        glitr_convert.NullValue -> Ok(Nil)
+        NullValue -> Ok(Nil)
         other -> Error([dynamic.DecodeError("NullValue", get_type(other), [])])
       }
     },
-    glitr_convert.Null,
+    Null,
   )
 }
 
@@ -231,10 +263,10 @@ pub fn null() -> Converter(Nil) {
 /// `of` is a converter for the type of the elements.
 pub fn list(of: Converter(a)) -> Converter(List(a)) {
   Converter(
-    fn(v: List(a)) { glitr_convert.ListValue(v |> list.map(of.encoder)) },
+    fn(v: List(a)) { ListValue(v |> list.map(of.encoder)) },
     fn(v: GlitrValue) {
       case v {
-        glitr_convert.ListValue(vals) ->
+        ListValue(vals) ->
           vals
           |> list.fold(Ok([]), fn(result, val) {
             case result, of.decoder(val) {
@@ -246,7 +278,7 @@ pub fn list(of: Converter(a)) -> Converter(List(a)) {
         other -> Error([dynamic.DecodeError("ListValue", get_type(other), [])])
       }
     },
-    glitr_convert.List(of.type_def),
+    List(of.type_def),
   )
 }
 
@@ -255,19 +287,17 @@ pub fn list(of: Converter(a)) -> Converter(List(a)) {
 /// `of` is a converter for the optional value.
 pub fn optional(of: Converter(a)) -> Converter(option.Option(a)) {
   Converter(
-    fn(v: option.Option(a)) {
-      glitr_convert.OptionalValue(v |> option.map(of.encoder))
-    },
+    fn(v: option.Option(a)) { OptionalValue(v |> option.map(of.encoder)) },
     fn(v: GlitrValue) {
       case v {
-        glitr_convert.OptionalValue(option.None) -> Ok(option.None)
-        glitr_convert.OptionalValue(option.Some(val)) ->
+        OptionalValue(option.None) -> Ok(option.None)
+        OptionalValue(option.Some(val)) ->
           val |> of.decoder |> result.map(option.Some)
         other ->
           Error([dynamic.DecodeError("OptionalValue", get_type(other), [])])
       }
     },
-    glitr_convert.Optional(of.type_def),
+    Optional(of.type_def),
   )
 }
 
@@ -281,21 +311,19 @@ pub fn result(
 ) -> Converter(Result(ok, err)) {
   Converter(
     fn(v: Result(ok, err)) {
-      glitr_convert.ResultValue(
+      ResultValue(
         v |> result.map(res.encoder) |> result.map_error(error.encoder),
       )
     },
     fn(v: GlitrValue) {
       case v {
-        glitr_convert.ResultValue(Ok(val)) ->
-          val |> res.decoder |> result.map(Ok)
-        glitr_convert.ResultValue(Error(val)) ->
-          val |> error.decoder |> result.map(Error)
+        ResultValue(Ok(val)) -> val |> res.decoder |> result.map(Ok)
+        ResultValue(Error(val)) -> val |> error.decoder |> result.map(Error)
         other ->
           Error([dynamic.DecodeError("ResultValue", get_type(other), [])])
       }
     },
-    glitr_convert.Result(res.type_def, error.type_def),
+    Result(res.type_def, error.type_def),
   )
 }
 
@@ -314,7 +342,7 @@ pub fn dict(
 ) -> Converter(dict.Dict(k, v)) {
   Converter(
     fn(v: dict.Dict(k, v)) {
-      glitr_convert.DictValue(
+      DictValue(
         v
         |> dict.to_list
         |> list.map(fn(kv) { #(kv.0 |> key.encoder, kv.1 |> value.encoder) })
@@ -323,7 +351,7 @@ pub fn dict(
     },
     fn(v: GlitrValue) {
       case v {
-        glitr_convert.DictValue(d) ->
+        DictValue(d) ->
           d
           |> dict.to_list
           |> list.fold(Ok([]), fn(result, kv) {
@@ -346,7 +374,7 @@ pub fn dict(
         other -> Error([dynamic.DecodeError("DictValue", get_type(other), [])])
       }
     },
-    glitr_convert.Dict(key.type_def, value.type_def),
+    Dict(key.type_def, value.type_def),
   )
 }
 
@@ -410,13 +438,13 @@ pub fn enum(
       let tag = tags(v)
 
       case converters |> list.key_find(tag) {
-        Ok(variant) -> glitr_convert.EnumValue(tag, variant.encoder(v))
-        Error(_) -> glitr_convert.NullValue
+        Ok(variant) -> EnumValue(tag, variant.encoder(v))
+        Error(_) -> NullValue
       }
     },
     fn(v: GlitrValue) {
       case v {
-        glitr_convert.EnumValue(variant_name, value) -> {
+        EnumValue(variant_name, value) -> {
           use variant <- result.try(
             converters
             |> list.key_find(variant_name)
@@ -434,25 +462,23 @@ pub fn enum(
         other -> Error([dynamic.DecodeError("EnumValue", get_type(other), [])])
       }
     },
-    glitr_convert.Enum(
-      converters |> list.map(fn(var) { #(var.0, { var.1 }.type_def) }),
-    ),
+    Enum(converters |> list.map(fn(var) { #(var.0, { var.1 }.type_def) })),
   )
 }
 
 fn get_type(val: GlitrValue) -> String {
   case val {
-    glitr_convert.BoolValue(_) -> "BoolValue"
-    glitr_convert.DictValue(_) -> "DictValue"
-    glitr_convert.EnumValue(_, _) -> "EnumValue"
-    glitr_convert.FloatValue(_) -> "FloatValue"
-    glitr_convert.IntValue(_) -> "IntValue"
-    glitr_convert.ListValue(_) -> "ListValue"
-    glitr_convert.NullValue -> "NullValue"
-    glitr_convert.ObjectValue(_) -> "ObjectValue"
-    glitr_convert.OptionalValue(_) -> "OptionalValue"
-    glitr_convert.ResultValue(_) -> "ResultValue"
-    glitr_convert.StringValue(_) -> "StringValue"
+    BoolValue(_) -> "BoolValue"
+    DictValue(_) -> "DictValue"
+    EnumValue(_, _) -> "EnumValue"
+    FloatValue(_) -> "FloatValue"
+    IntValue(_) -> "IntValue"
+    ListValue(_) -> "ListValue"
+    NullValue -> "NullValue"
+    ObjectValue(_) -> "ObjectValue"
+    OptionalValue(_) -> "OptionalValue"
+    ResultValue(_) -> "ResultValue"
+    StringValue(_) -> "StringValue"
   }
 }
 
