@@ -1,13 +1,13 @@
 name = "glitr_convert_sql"
-version = "1.0.0"
+version = "0.1.13"
 
 # Fill out these fields if you intend to generate HTML documentation or publish
 # your project to the Hex package manager.
 #
-# description = ""
-# licences = ["Apache-2.0"]
-# repository = { type = "github", user = "", repo = "" }
-# links = [{ title = "Website", href = "" }]
+description = "Create SQL requests from Gleam types effortlessly !"
+licences = ["Apache-2.0"]
+repository = { type = "github", user = "Billuc", repo = "glitr" }
+links = [{ title = "Website", href = "https://hexdocs.pm/glitr_convert_sql" }]
 #
 # For a full reference of all the available options, you can have a look at
 # https://gleam.run/writing-gleam/gleam-toml/.
@@ -15,7 +15,7 @@ version = "1.0.0"
 [dependencies]
 gleam_stdlib = ">= 0.34.0 and < 2.0.0"
 glitr_convert = ">= 0.1.13 and < 1.0.0"
-gleam_json = ">= 2.0.0 and < 3.0.0"
+gleam_json = ">= 1.0.0 and < 3.0.0"
 
 [dev-dependencies]
 gleeunit = ">= 1.0.0 and < 2.0.0"
