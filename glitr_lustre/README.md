@@ -28,7 +28,6 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       |> glitr_lustre.with_host("localhost")
       |> glitr_lustre.with_port(2345)
       |> glitr_lustre.for_route(todo_service() |> create_route)
-      |> glitr_lustre.with_path(Nil) // Required, for now
       |> glitr_lustre.with_body(CreateTodo(title))
       |> glitr_lustre.send(ServerCreatedTodo, fn(_) { effect.none() })
     )

@@ -5,7 +5,7 @@ import gleam/list
 
 /// The type of path that can be expected from a Route
 pub type PathType {
-  StaticPath
+  StaticPath(root: List(String))
   ComplexPath
 }
 
@@ -26,7 +26,7 @@ pub opaque type RoutePath(path_type) {
 /// Create a RoutePath that will solely match a static path
 pub fn static_path(root: List(String)) -> RoutePath(Nil) {
   RoutePath(
-    StaticPath,
+    StaticPath(root),
     PathConverter(
       fn(_) { root },
       //

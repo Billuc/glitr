@@ -95,7 +95,6 @@ pub fn with_options(
 }
 
 /// Set the path data for this request  
-/// Note that, for now, you have to call this method before sending the request
 pub fn with_path(
   request: RouteRequest(p, _, _, _),
   path: p,
@@ -164,15 +163,17 @@ fn add_path(
   then: fn(request.Request(String)) -> effect.Effect(msg),
 ) -> effect.Effect(msg) {
   case rreq.route.path |> path.get_type, rreq.path_opt {
-    _, None ->
+    path.ComplexPath, None ->
       on_error("Path option is missing, please call with_path before send")
-    _, Some(path) ->
+    path.ComplexPath, Some(path) ->
       then(
         req
         |> request.set_path(
           rreq.route.path |> path.encode(path) |> string.join("/"),
         ),
       )
+    path.StaticPath(root), _ ->
+      then(req |> request.set_path(root |> string.join("/")))
   }
 }
 
