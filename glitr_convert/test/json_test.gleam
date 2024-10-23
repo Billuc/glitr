@@ -10,15 +10,10 @@ type TestType {
 pub fn simple_object_decode_test() {
   let test_converter =
     c.object({
-      use a <- c.parameter
-      use b <- c.parameter
-      use <- c.constructor
-
-      TestType(a, b)
+      use a <- c.field("a", fn(v: TestType) { Ok(v.a) }, c.string())
+      use b <- c.field("b", fn(v: TestType) { Ok(v.b) }, c.int())
+      c.success(TestType(a, b))
     })
-    |> c.field("a", fn(v) { Ok(v.a) }, c.string())
-    |> c.field("b", fn(v) { Ok(v.b) }, c.int())
-    |> c.to_converter
 
   json.decode("{\"a\": \"Age\", \"b\": 28}", j.json_decode(test_converter))
   |> should.be_ok
@@ -28,15 +23,10 @@ pub fn simple_object_decode_test() {
 pub fn simple_object_encode_test() {
   let test_converter =
     c.object({
-      use a <- c.parameter
-      use b <- c.parameter
-      use <- c.constructor
-
-      TestType(a, b)
+      use a <- c.field("a", fn(v: TestType) { Ok(v.a) }, c.string())
+      use b <- c.field("b", fn(v: TestType) { Ok(v.b) }, c.int())
+      c.success(TestType(a, b))
     })
-    |> c.field("a", fn(v) { Ok(v.a) }, c.string())
-    |> c.field("b", fn(v) { Ok(v.b) }, c.int())
-    |> c.to_converter
 
   TestType("Tom", 57)
   |> j.json_encode(test_converter)
@@ -52,28 +42,22 @@ type ComplexType {
 pub fn complex_type_decode_test() {
   let test_converter =
     c.object({
-      use first <- c.parameter
-      use second <- c.parameter
-      use <- c.constructor
-
-      ComplexType(first:, second:)
+      use first <- c.field(
+        "first",
+        fn(v: ComplexType) { Ok(v.first) },
+        c.list(c.string()),
+      )
+      use second <- c.field(
+        "second",
+        fn(v: ComplexType) { Ok(v.second) },
+        c.object({
+          use a <- c.field("a", fn(v: TestType) { Ok(v.a) }, c.string())
+          use b <- c.field("b", fn(v: TestType) { Ok(v.b) }, c.int())
+          c.success(TestType(a, b))
+        }),
+      )
+      c.success(ComplexType(first:, second:))
     })
-    |> c.field("first", fn(v) { Ok(v.first) }, c.list(c.string()))
-    |> c.field(
-      "second",
-      fn(v) { Ok(v.second) },
-      c.object({
-        use a <- c.parameter
-        use b <- c.parameter
-        use <- c.constructor
-
-        TestType(a, b)
-      })
-        |> c.field("a", fn(v) { Ok(v.a) }, c.string())
-        |> c.field("b", fn(v) { Ok(v.b) }, c.int())
-        |> c.to_converter,
-    )
-    |> c.to_converter
 
   json.decode(
     "{
@@ -92,28 +76,22 @@ pub fn complex_type_decode_test() {
 pub fn complex_type_encode_test() {
   let test_converter =
     c.object({
-      use first <- c.parameter
-      use second <- c.parameter
-      use <- c.constructor
-
-      ComplexType(first:, second:)
+      use first <- c.field(
+        "first",
+        fn(v: ComplexType) { Ok(v.first) },
+        c.list(c.string()),
+      )
+      use second <- c.field(
+        "second",
+        fn(v: ComplexType) { Ok(v.second) },
+        c.object({
+          use a <- c.field("a", fn(v: TestType) { Ok(v.a) }, c.string())
+          use b <- c.field("b", fn(v: TestType) { Ok(v.b) }, c.int())
+          c.success(TestType(a, b))
+        }),
+      )
+      c.success(ComplexType(first:, second:))
     })
-    |> c.field("first", fn(v) { Ok(v.first) }, c.list(c.string()))
-    |> c.field(
-      "second",
-      fn(v) { Ok(v.second) },
-      c.object({
-        use a <- c.parameter
-        use b <- c.parameter
-        use <- c.constructor
-
-        TestType(a, b)
-      })
-        |> c.field("a", fn(v) { Ok(v.a) }, c.string())
-        |> c.field("b", fn(v) { Ok(v.b) }, c.int())
-        |> c.to_converter,
-    )
-    |> c.to_converter
 
   ComplexType(["hello, world", "foo"], TestType("bar", 0))
   |> j.json_encode(test_converter)
@@ -143,58 +121,46 @@ pub type TestEnum {
 pub fn enum_decode_test() {
   let variant_a_converter =
     c.object({
-      use msg <- c.parameter
-      use <- c.constructor
-
-      VariantA(msg:)
+      use msg <- c.field(
+        "msg",
+        fn(v) {
+          case v {
+            VariantA(msg) -> Ok(msg)
+            _ -> Error(Nil)
+          }
+        },
+        c.string(),
+      )
+      c.success(VariantA(msg:))
     })
-    |> c.field(
-      "msg",
-      fn(v) {
-        case v {
-          VariantA(msg) -> Ok(msg)
-          _ -> Error(Nil)
-        }
-      },
-      c.string(),
-    )
-    |> c.to_converter
   let variant_b_converter =
     c.object({
-      use msg <- c.parameter
-      use <- c.constructor
-
-      VariantB(msg:)
+      use msg <- c.field(
+        "msg",
+        fn(v) {
+          case v {
+            VariantB(msg) -> Ok(msg)
+            _ -> Error(Nil)
+          }
+        },
+        c.string(),
+      )
+      c.success(VariantB(msg:))
     })
-    |> c.field(
-      "msg",
-      fn(v) {
-        case v {
-          VariantB(msg) -> Ok(msg)
-          _ -> Error(Nil)
-        }
-      },
-      c.string(),
-    )
-    |> c.to_converter
   let variant_c_converter =
     c.object({
-      use age <- c.parameter
-      use <- c.constructor
-
-      VariantC(age:)
+      use age <- c.field(
+        "age",
+        fn(v) {
+          case v {
+            VariantC(age) -> Ok(age)
+            _ -> Error(Nil)
+          }
+        },
+        c.int(),
+      )
+      c.success(VariantC(age:))
     })
-    |> c.field(
-      "age",
-      fn(v) {
-        case v {
-          VariantC(age) -> Ok(age)
-          _ -> Error(Nil)
-        }
-      },
-      c.int(),
-    )
-    |> c.to_converter
 
   let test_converter =
     c.enum(
@@ -246,58 +212,46 @@ pub fn enum_decode_test() {
 pub fn enum_encode_test() {
   let variant_a_converter =
     c.object({
-      use msg <- c.parameter
-      use <- c.constructor
-
-      VariantA(msg:)
+      use msg <- c.field(
+        "msg",
+        fn(v) {
+          case v {
+            VariantA(msg) -> Ok(msg)
+            _ -> Error(Nil)
+          }
+        },
+        c.string(),
+      )
+      c.success(VariantA(msg:))
     })
-    |> c.field(
-      "msg",
-      fn(v) {
-        case v {
-          VariantA(msg) -> Ok(msg)
-          _ -> Error(Nil)
-        }
-      },
-      c.string(),
-    )
-    |> c.to_converter
   let variant_b_converter =
     c.object({
-      use msg <- c.parameter
-      use <- c.constructor
-
-      VariantB(msg:)
+      use msg <- c.field(
+        "msg",
+        fn(v) {
+          case v {
+            VariantB(msg) -> Ok(msg)
+            _ -> Error(Nil)
+          }
+        },
+        c.string(),
+      )
+      c.success(VariantB(msg:))
     })
-    |> c.field(
-      "msg",
-      fn(v) {
-        case v {
-          VariantB(msg) -> Ok(msg)
-          _ -> Error(Nil)
-        }
-      },
-      c.string(),
-    )
-    |> c.to_converter
   let variant_c_converter =
     c.object({
-      use age <- c.parameter
-      use <- c.constructor
-
-      VariantC(age:)
+      use age <- c.field(
+        "age",
+        fn(v) {
+          case v {
+            VariantC(age) -> Ok(age)
+            _ -> Error(Nil)
+          }
+        },
+        c.int(),
+      )
+      c.success(VariantC(age:))
     })
-    |> c.field(
-      "age",
-      fn(v) {
-        case v {
-          VariantC(age) -> Ok(age)
-          _ -> Error(Nil)
-        }
-      },
-      c.int(),
-    )
-    |> c.to_converter
 
   let test_converter =
     c.enum(

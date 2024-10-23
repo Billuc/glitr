@@ -8,15 +8,10 @@ type TestType {
 pub fn simple_object_encode_test() {
   let test_converter =
     convert.object({
-      use a <- convert.parameter
-      use b <- convert.parameter
-      use <- convert.constructor
-
-      TestType(a, b)
+      use a <- convert.field("a", fn(v: TestType) { Ok(v.a) }, convert.string())
+      use b <- convert.field("b", fn(v: TestType) { Ok(v.b) }, convert.int())
+      convert.success(TestType(a, b))
     })
-    |> convert.field("a", fn(v) { Ok(v.a) }, convert.string())
-    |> convert.field("b", fn(v) { Ok(v.b) }, convert.int())
-    |> convert.to_converter
 
   TestType("hello", 78)
   |> convert.encode(test_converter)
@@ -28,6 +23,19 @@ pub fn simple_object_encode_test() {
   )
 }
 
+pub fn simple_object_type_def_test() {
+  let test_converter =
+    convert.object({
+      use a <- convert.field("a", fn(v: TestType) { Ok(v.a) }, convert.string())
+      use b <- convert.field("b", fn(v: TestType) { Ok(v.b) }, convert.int())
+      convert.success(TestType(a, b))
+    })
+
+  test_converter
+  |> convert.type_def
+  |> should.equal(convert.Object([#("a", convert.String), #("b", convert.Int)]))
+}
+
 type ComplexType {
   ComplexType(first: List(String), second: TestType)
 }
@@ -35,32 +43,30 @@ type ComplexType {
 pub fn complex_type_encode_test() {
   let test_converter =
     convert.object({
-      use first <- convert.parameter
-      use second <- convert.parameter
-      use <- convert.constructor
-
-      ComplexType(first:, second:)
+      use first <- convert.field(
+        "first",
+        fn(v: ComplexType) { Ok(v.first) },
+        convert.list(convert.string()),
+      )
+      use second <- convert.field(
+        "second",
+        fn(v: ComplexType) { Ok(v.second) },
+        convert.object({
+          use a <- convert.field(
+            "a",
+            fn(v: TestType) { Ok(v.a) },
+            convert.string(),
+          )
+          use b <- convert.field(
+            "b",
+            fn(v: TestType) { Ok(v.b) },
+            convert.int(),
+          )
+          convert.success(TestType(a, b))
+        }),
+      )
+      convert.success(ComplexType(first:, second:))
     })
-    |> convert.field(
-      "first",
-      fn(v) { Ok(v.first) },
-      convert.list(convert.string()),
-    )
-    |> convert.field(
-      "second",
-      fn(v) { Ok(v.second) },
-      convert.object({
-        use a <- convert.parameter
-        use b <- convert.parameter
-        use <- convert.constructor
-
-        TestType(a, b)
-      })
-        |> convert.field("a", fn(v) { Ok(v.a) }, convert.string())
-        |> convert.field("b", fn(v) { Ok(v.b) }, convert.int())
-        |> convert.to_converter,
-    )
-    |> convert.to_converter
 
   ComplexType(["Adam", "Bob", "Carmen", "Dorothy"], TestType("Grade", 15))
   |> convert.encode(test_converter)

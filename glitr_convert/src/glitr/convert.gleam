@@ -47,112 +47,80 @@ pub opaque type Converter(a) {
     encoder: fn(a) -> GlitrValue,
     decoder: fn(GlitrValue) -> Result(a, List(dynamic.DecodeError)),
     type_def: GlitrType,
+    // Temporary ugly stuff, while searching for a better solution
+    default_value: a,
   )
 }
 
-/// This is an intermediary type to build converters for a custom Gleam type.  
-/// TODO: rename
-pub opaque type ObjectDefinition(current, base) {
-  ObjectDefinition(constructor: fn() -> base)
-  ObjectParameterDefinition(constructor: fn(current) -> base)
-}
-
-/// This is an intermediary type to build converters for a custom Gleam type.  
-/// TODO: rename
-pub opaque type ObjectConverterBuilder(current, base) {
-  ObjectConverterBuilder(
-    encoder: fn(base, current) -> GlitrValue,
-    decoder: fn(GlitrValue, current) -> Result(base, List(dynamic.DecodeError)),
-    type_def: GlitrType,
+/// Intermediate type to build a converter for an object type
+pub opaque type PartialConverter(base) {
+  PartialConverter(
+    encoder: fn(base) -> GlitrValue,
+    decoder: fn(GlitrValue) -> Result(base, List(dynamic.DecodeError)),
+    fields_def: List(#(String, GlitrType)),
+    // Temporary ugly stuff, while searching for a better solution
+    default_value: Result(base, List(dynamic.DecodeError)),
   )
 }
 
-/// Build a converter for a custom Gleam type.
+/// Create a Converter from a PartialConverter
 /// 
-/// Example: 
+/// Example:
 /// ```
 /// type Person {
 ///   Person(name: String, age: Int)
 /// }
 /// 
-/// let converter = object({
-///   use name <- parameter
-///   use age <- parameter
-///   use <- constructor
-/// 
-///   Person(name:, age:)
+/// let convert = object({
+///   use name <- field("name", fn(v: Person) { Ok(v.name) }, string())
+///   use age <- field("age", fn(v: Person) { Ok(v.age) }, int())
+///   success(Person(name:, age:))
 /// })
-/// |> field("name", fn(v) { Ok(v.name) }, string())
-/// |> field("age", fn(v) { Ok(v.age) }, int())
-/// |> to_converter
 /// ```
-pub fn object(
-  object_converter: ObjectDefinition(a, b),
-) -> ObjectConverterBuilder(a, b) {
-  ObjectConverterBuilder(
-    fn(_, _) { ObjectValue([]) },
-    fn(_, curr) {
-      case object_converter {
-        ObjectDefinition(constructor) -> Ok(constructor())
-        ObjectParameterDefinition(constructor) -> Ok(constructor(curr))
-      }
-    },
-    Object([]),
+pub fn object(converter: PartialConverter(a)) -> Converter(a) {
+  let assert Ok(default_value) = converter.default_value
+
+  Converter(
+    converter.encoder,
+    converter.decoder,
+    Object(converter.fields_def),
+    default_value,
   )
 }
 
-/// Specify a new parameter to be used in an object converter.  
-/// See `object()`
-pub fn parameter(
-  next: fn(a) -> ObjectDefinition(b, c),
-) -> ObjectDefinition(#(a, b), c) {
-  ObjectParameterDefinition(fn(v: #(a, b)) {
-    case next(v.0) {
-      ObjectDefinition(constructor) -> constructor()
-      ObjectParameterDefinition(constructor) -> constructor(v.1)
-    }
-  })
-}
-
-/// Specify that the next instruction returns a constructed instance of the type to convert.  
-/// See `object()`
-pub fn constructor(c: fn() -> a) -> ObjectDefinition(Nil, a) {
-  ObjectDefinition(c)
-}
-
-/// Provide information about the fields of an object converter. 
-///  
-/// `field_name` is the key that will be used in the encoded data.  
-/// `field_getter` is a function returning a way to access the field from an instance.  
-/// `field_type` is the converter to use for this field.  
+/// Add a field to a PartialConverter  
+/// See `object` for its usage details
 /// 
-/// See `object()` for an example.
+/// 'field_name' is the field name that will be used in the converted value. It may not be equal to the actual field name.  
+/// 'field_getter' is a function that returns the value of the field from the complete object.  
+/// 'field_type' is a Converter associated to the type of the field.
 pub fn field(
-  converter: ObjectConverterBuilder(#(a, b), c),
   field_name: String,
   field_getter: fn(c) -> Result(a, Nil),
   field_type: Converter(a),
-) -> ObjectConverterBuilder(b, c) {
-  ObjectConverterBuilder(
-    encoder: fn(base: c, curr: b) {
+  next: fn(a) -> PartialConverter(c),
+) -> PartialConverter(c) {
+  PartialConverter(
+    encoder: fn(base: c) {
       let value = field_getter(base)
 
       case value {
         Error(Nil) -> NullValue
         Ok(field_value) -> {
-          case converter.encoder(base, #(field_value, curr)) {
+          let converter = next(field_value)
+
+          case converter.encoder(base) {
             ObjectValue(fields) ->
-              ObjectValue(
-                list.append(fields, [
-                  #(field_name, field_type.encoder(field_value)),
-                ]),
-              )
+              ObjectValue([
+                #(field_name, field_type.encoder(field_value)),
+                ..fields
+              ])
             _ -> NullValue
           }
         }
       }
     },
-    decoder: fn(v: GlitrValue, curr: b) {
+    decoder: fn(v: GlitrValue) {
       case v {
         ObjectValue(values) -> {
           let field_value =
@@ -165,26 +133,26 @@ pub fn field(
 
           use a <- result.try(field_value)
 
-          converter.decoder(v, #(a, curr))
+          next(a).decoder(v)
         }
         _ -> Error([])
       }
     },
-    type_def: case converter.type_def {
-      Object(fields) ->
-        Object(list.append(fields, [#(field_name, field_type.type_def)]))
-      _ -> Object([#(field_name, field_type.type_def)])
+    fields_def: {
+      let converter = next(field_type.default_value)
+      [#(field_name, field_type.type_def), ..converter.fields_def]
+    },
+    default_value: {
+      let converter = next(field_type.default_value)
+      converter.default_value
     },
   )
 }
 
-/// Generate a converter from a builder type
-pub fn to_converter(converter: ObjectConverterBuilder(Nil, a)) -> Converter(a) {
-  Converter(
-    encoder: converter.encoder(_, Nil),
-    decoder: converter.decoder(_, Nil),
-    type_def: converter.type_def,
-  )
+/// Used to initialize a PartialConverter  
+/// See `object` for its usage details
+pub fn success(c: a) -> PartialConverter(a) {
+  PartialConverter(fn(_) { ObjectValue([]) }, fn(_) { Ok(c) }, [], Ok(c))
 }
 
 /// Basic converter for a String value
@@ -199,6 +167,7 @@ pub fn string() -> Converter(String) {
       }
     },
     String,
+    "",
   )
 }
 
@@ -213,6 +182,7 @@ pub fn bool() -> Converter(Bool) {
       }
     },
     Bool,
+    False,
   )
 }
 
@@ -227,6 +197,7 @@ pub fn float() -> Converter(Float) {
       }
     },
     Float,
+    0.0,
   )
 }
 
@@ -241,6 +212,7 @@ pub fn int() -> Converter(Int) {
       }
     },
     Int,
+    0,
   )
 }
 
@@ -255,6 +227,7 @@ pub fn null() -> Converter(Nil) {
       }
     },
     Null,
+    Nil,
   )
 }
 
@@ -279,6 +252,7 @@ pub fn list(of: Converter(a)) -> Converter(List(a)) {
       }
     },
     List(of.type_def),
+    [],
   )
 }
 
@@ -298,6 +272,7 @@ pub fn optional(of: Converter(a)) -> Converter(option.Option(a)) {
       }
     },
     Optional(of.type_def),
+    option.None,
   )
 }
 
@@ -324,6 +299,7 @@ pub fn result(
       }
     },
     Result(res.type_def, error.type_def),
+    Ok(res.default_value),
   )
 }
 
@@ -375,6 +351,7 @@ pub fn dict(
       }
     },
     Dict(key.type_def, value.type_def),
+    dict.new(),
   )
 }
 
@@ -391,30 +368,24 @@ pub fn dict(
 /// }
 /// 
 /// let open_converter = object({
-///   use id <- parameter
-///   use <- constructor
-///   Open(id:)
+///   use id <- field("id", fn(v: Action) {
+///     case v {
+///       Open(id) -> Ok(id)
+///       _ -> Error(Nil)
+///     }
+///   }, string())
+///   success(Open(id:))
 /// })
-/// |> field("id", fn(v) {
-///   case v {
-///     Open(id) -> Ok(id)
-///     _ -> Error(Nil)
-///   }
-/// })
-/// |> to_converter
 /// 
 /// let close_converter = object({
-///   use id <- parameter
-///   use <- constructor
-///   Close(id:)
+///   use id <- field("id", fn(v: Action) {
+///     case v {
+///       Close(id) -> Ok(id)
+///       _ -> Error(Nil)
+///     }
+///   }, string())
+///   success(Close(id:))
 /// })
-/// |> field("id", fn(v) {
-///   case v {
-///     Close(id) -> Ok(id)
-///     _ -> Error(Nil)
-///   }
-/// })
-/// |> to_converter
 /// 
 /// let action_converter = enum(
 ///   fn(v) {
@@ -463,6 +434,10 @@ pub fn enum(
       }
     },
     Enum(converters |> list.map(fn(var) { #(var.0, { var.1 }.type_def) })),
+    {
+      let assert [first, ..] = converters
+      { first.1 }.default_value
+    },
   )
 }
 
@@ -495,6 +470,7 @@ pub fn decode(
   converter.decoder
 }
 
+/// Return the GlitrType associated with the converter
 pub fn type_def(converter: Converter(a)) -> GlitrType {
   converter.type_def
 }
