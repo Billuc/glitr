@@ -28,14 +28,10 @@ pub type Person {
 pub fn main() {
   let converter =
     c.object({
-      use name <- c.parameter
-      use age <- c.parameter
-      use <- c.constructor
-      Person(name:, age:)
+      use name <- c.field("name", fn(v: Person) { Ok(v.name) }, c.string())
+      use age <- c.field("age", fn(v: Person) { Ok(v.age) }, c.int())
+      c.success(Person(name:, age:))
     })
-    |> c.field("name", fn(v) { Ok(v.name) }, c.string())
-    |> c.field("age", fn(v) { Ok(v.age) }, c.int())
-    |> c.to_converter
 
   Person("Anna", 21)
   |> glitr_json.json_encode(converter)
