@@ -441,6 +441,50 @@ pub fn enum(
   )
 }
 
+/// Create a converter by mapping the encode and decode functions from an existing one
+/// 
+/// Example:
+/// ```
+/// pub type Date {
+///   Date(year: Int, month: Int, day: Int)
+/// }
+/// 
+/// // We are storing the date as a string for optimized memory storage
+/// pub fn date_converter() -> Converter(Date) {
+///   string()
+///   |> map(
+///     fn(v: Date) { [v.year, v.month, v.day] |> list.map(int.to_string) |> string.join("/") },
+///     fn(v: String) { 
+///       let elems = string.split(v, "/")
+///       case elems {
+///         [y, m, d, ..] -> Date(y, m, d)
+///         [y, m]  -> Date(y, m, -1)
+///         [y] -> Date(y, -1, -1)
+///         [] -> Date(-1, -1, -1)
+///       }
+///     }
+///   )
+/// }
+/// ```
+pub fn map(
+  converter: Converter(a),
+  encode_map: fn(b) -> a,
+  decode_map: fn(a) -> b,
+) -> Converter(b) {
+  Converter(
+    fn(v: b) {
+      let a_value = encode_map(v)
+      converter.encoder(a_value)
+    },
+    fn(v: GlitrValue) {
+      converter.decoder(v)
+      |> result.map(decode_map)
+    },
+    converter.type_def,
+    converter.default_value |> decode_map,
+  )
+}
+
 fn get_type(val: GlitrValue) -> String {
   case val {
     BoolValue(_) -> "BoolValue"

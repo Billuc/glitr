@@ -1,5 +1,5 @@
 name = "glitr_convert_cake"
-version = "0.1.13"
+version = "0.1.14"
 
 # Fill out these fields if you intend to generate HTML documentation or publish
 # your project to the Hex package manager.
@@ -15,7 +15,7 @@ links = [{ title = "Website", href = "https://hexdocs.pm/glitr_convert_cake" }]
 [dependencies]
 gleam_stdlib = ">= 0.34.0 and < 2.0.0"
 glitr_convert = ">= 0.1.13 and < 1.0.0"
-cake = ">= 1.1.2 and < 2.0.0"
+cake = ">= 1.0.0 and < 3.0.0"
 gleam_json = ">= 1.0.0 and < 3.0.0"
 
 [dev-dependencies]
