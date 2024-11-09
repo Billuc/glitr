@@ -1,9 +1,12 @@
 import glance
 import glance_printer
+import gleam/bool
 import gleam/int
 import gleam/list
+import gleam/option
 import gleam/string
 import gleam/string_builder
+import glitr/orm/compare
 import glitr/orm/types
 
 fn capitalise(str: String) -> String {
@@ -42,7 +45,7 @@ pub fn render_table_file(table: types.Table) {
   }
 }
 
-pub fn render_type(table: types.Table) -> String {
+fn render_type(table: types.Table) -> String {
   string_builder.new()
   |> string_builder.append("pub type ")
   |> string_builder.append(capitalise(table.name))
@@ -71,7 +74,7 @@ fn field_to_gleam_type(field: types.Column) -> String {
   }
 }
 
-pub fn render_fields(table: types.Table) -> String {
+fn render_fields(table: types.Table) -> String {
   string_builder.new()
   |> string_builder.append("pub opaque type ")
   |> string_builder.append(capitalise(table.name))
@@ -90,7 +93,7 @@ fn render_fields_fields(fields: List(types.Column)) -> String {
   |> string.join(", ")
 }
 
-pub fn render_fields_fn(table: types.Table) -> String {
+fn render_fields_fn(table: types.Table) -> String {
   string_builder.new()
   |> string_builder.append("pub fn fields() -> ")
   |> string_builder.append(capitalise(table.name))
@@ -114,7 +117,7 @@ fn render_fields_fn_fields(fields: List(types.Column)) -> String {
   |> string.join(", ")
 }
 
-pub fn render_field_list_fn(table: types.Table) -> String {
+fn render_field_list_fn(table: types.Table) -> String {
   string_builder.new()
   |> string_builder.append("pub fn field_list() -> List(String) {\n\t[")
   |> string_builder.append(
@@ -137,7 +140,7 @@ fn field_to_converter(field: types.Column) -> String {
   }
 }
 
-pub fn render_converter(table: types.Table) -> String {
+fn render_converter(table: types.Table) -> String {
   string_builder.new()
   |> string_builder.append("pub fn converter() -> convert.Converter(")
   |> string_builder.append(capitalise(table.name))
@@ -171,4 +174,154 @@ fn render_convert_fields(table: types.Table) -> String {
     |> string_builder.to_string
   })
   |> string.join("\n")
+}
+
+pub fn render_migration(changes: List(compare.SchemaChange)) -> String {
+  list.map(changes, fn(ch) { render_schema_change(ch) })
+  |> string.join("\n")
+}
+
+fn render_schema_change(change: compare.SchemaChange) -> String {
+  case change {
+    compare.NewTable(t) -> render_create_table(t)
+    compare.DropTable(t) -> render_drop_table(t)
+    compare.TableChanges(t, ch) -> render_table_changes(t, ch)
+  }
+}
+
+fn render_create_table(table: types.Table) -> String {
+  string_builder.new()
+  |> string_builder.append("CREATE TABLE ")
+  |> string_builder.append(table.name)
+  |> string_builder.append("(\n\t")
+  |> string_builder.append(render_sql_fields(table.name, table.columns))
+  |> string_builder.append("\n);")
+  |> string_builder.to_string
+}
+
+fn render_drop_table(table: types.Table) -> String {
+  string_builder.new()
+  |> string_builder.append("DROP TABLE ")
+  |> string_builder.append(table.name)
+  |> string_builder.append(";")
+  |> string_builder.to_string
+}
+
+fn render_sql_fields(table_name: String, fields: List(types.Column)) -> String {
+  list.map(fields, fn(f) { render_sql_field(table_name, f, True) })
+  |> string.join(",\n")
+}
+
+fn append_if(
+  builder: string_builder.StringBuilder,
+  predicate: Bool,
+  suffix: String,
+) -> string_builder.StringBuilder {
+  case predicate {
+    False -> builder
+    True -> builder |> string_builder.append(suffix)
+  }
+}
+
+fn render_sql_field(
+  table_name: String,
+  field: types.Column,
+  with_constraints: Bool,
+) -> String {
+  let builder =
+    string_builder.new()
+    |> string_builder.append(field.name)
+    |> string_builder.append(" ")
+    |> string_builder.append(field_type_to_db_type(field.type_))
+
+  use <- bool.guard(!with_constraints, builder |> string_builder.to_string)
+
+  let builder =
+    builder
+    |> append_if(field.primary_key, " PRIMARY KEY")
+    |> append_if(
+      bool.and(field.primary_key, field.auto_increment),
+      " AUTO INCREMENT",
+    )
+    |> append_if(field.unique, " UNIQUE")
+    |> append_if(!field.nullable, " NOT NULL")
+
+  let builder = case field.default {
+    option.None -> builder
+    option.Some(val) -> builder |> string_builder.append(" DEFAULT " <> val)
+  }
+
+  let builder = case field.foreign_key {
+    option.None -> builder
+    option.Some(ref) ->
+      builder |> render_foreign_key(ref, table_name, field.name)
+  }
+
+  builder |> string_builder.to_string
+}
+
+fn render_foreign_key(
+  builder: string_builder.StringBuilder,
+  reference: types.Reference,
+  table_name: String,
+  column_name: String,
+) -> string_builder.StringBuilder {
+  let referenced_table = case reference.table {
+    types.SelfRef -> table_name
+    types.TableRef(t) -> t.name
+  }
+
+  builder
+  |> string_builder.append(",\nCONSTRAINT FK_")
+  |> string_builder.append(referenced_table)
+  |> string_builder.append("_")
+  |> string_builder.append(reference.column.name)
+  |> string_builder.append(" FOREIGN KEY (")
+  |> string_builder.append(column_name)
+  |> string_builder.append(") REFERENCES ")
+  |> string_builder.append(referenced_table)
+  |> string_builder.append("(" <> reference.column.name <> ")")
+}
+
+fn field_type_to_db_type(t: types.ColumnType) -> String {
+  case t {
+    types.Varchar(k) -> "VARCHAR(" <> int.to_string(k) <> ")"
+    types.Integer -> "INTEGER"
+    types.Real -> "REAL"
+    types.DoublePrecision -> "DOUBLE PRECISION"
+    types.Boolean -> "BOOLEAN"
+    types.Date -> "DATE"
+    types.Time -> "TIME"
+    types.Timestamp -> "TIMESTAMP"
+  }
+}
+
+fn render_table_changes(
+  table_name: String,
+  changes: List(compare.TableChange),
+) -> String {
+  string_builder.new()
+  |> string_builder.append("ALTER TABLE ")
+  |> string_builder.append(table_name)
+  |> string_builder.append("\n")
+  |> string_builder.append(render_changes(table_name, changes))
+  |> string_builder.to_string
+}
+
+fn render_changes(
+  table_name: String,
+  changes: List(compare.TableChange),
+) -> String {
+  list.map(changes, fn(ch) { render_change(table_name, ch) })
+  |> string.join("\n")
+}
+
+fn render_change(table_name: String, change: compare.TableChange) -> String {
+  case change {
+    compare.ChangeType(_, _, _) -> ""
+    // TODO
+    compare.DropColumn(col) ->
+      "DROP " <> render_sql_field(table_name, col, False)
+    compare.NewColumn(col) -> "ADD " <> render_sql_field(table_name, col, True)
+  }
 }
