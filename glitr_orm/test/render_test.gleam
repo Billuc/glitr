@@ -9,7 +9,7 @@ pub fn render_simple_table_test() {
       schema.varchar("name", 255) |> schema.not_null(),
     ])
 
-  render.render_table_file(table)
+  render.render_table(table)
   |> should.equal(
     "import glitr/convert
 import glitr/orm

@@ -17,6 +17,8 @@ gleam_stdlib = ">= 0.34.0 and < 2.0.0"
 glitr_convert = ">= 0.2.2 and < 1.0.0"
 glance = ">= 0.11.0 and < 1.0.0"
 glance_printer = ">= 1.2.1 and < 2.0.0"
+simplifile = ">= 2.2.0 and < 3.0.0"
+shellout = ">= 1.6.0 and < 2.0.0"
 
 [dev-dependencies]
 gleeunit = ">= 1.0.0 and < 2.0.0"

@@ -2,18 +2,42 @@ import glance
 import glance_printer
 import gleam/bool
 import gleam/int
+import gleam/io
 import gleam/list
 import gleam/option
 import gleam/string
 import gleam/string_builder
 import glitr/orm/compare
+import glitr/orm/generate
 import glitr/orm/types
+import simplifile
 
 fn capitalise(str: String) -> String {
   str |> string.split("_") |> list.map(string.capitalise) |> string.join("")
 }
 
-pub fn render_table_file(table: types.Table) {
+pub fn render_table_files(tables: List(types.Table)) -> Nil {
+  case tables {
+    [] -> Nil
+    [t, ..rest] -> {
+      render_table_file(t)
+      render_table_files(rest)
+    }
+  }
+}
+
+pub fn render_table_file(table: types.Table) -> Nil {
+  let path = generate.base_dir <> "/" <> table.name <> ".gleam"
+  let _ = simplifile.create_file(path)
+  let content = render_table(table)
+
+  case simplifile.write(path, content) {
+    Error(err) -> io.println_error(simplifile.describe_error(err))
+    Ok(_) -> Nil
+  }
+}
+
+pub fn render_table(table: types.Table) -> String {
   let content =
     string_builder.new()
     |> string_builder.append("import glitr/convert\n")
@@ -176,7 +200,18 @@ fn render_convert_fields(table: types.Table) -> String {
   |> string.join("\n")
 }
 
-pub fn render_migration(changes: List(compare.SchemaChange)) -> String {
+pub fn render_migration_file(changes: List(compare.SchemaChange)) -> Nil {
+  let path = generate.gen_dir <> "/migration.sql"
+  let _ = simplifile.create_file(path)
+  let content = render_migration(changes)
+
+  case simplifile.write(path, content) {
+    Error(err) -> io.println_error(simplifile.describe_error(err))
+    Ok(_) -> Nil
+  }
+}
+
+fn render_migration(changes: List(compare.SchemaChange)) -> String {
   list.map(changes, fn(ch) { render_schema_change(ch) })
   |> string.join("\n")
 }
@@ -281,6 +316,24 @@ fn render_foreign_key(
   |> string_builder.append(") REFERENCES ")
   |> string_builder.append(referenced_table)
   |> string_builder.append("(" <> reference.column.name <> ")")
+  |> string_builder.append(render_on_delete(reference.on_delete))
+  |> string_builder.append(render_on_update(reference.on_update))
+}
+
+fn render_on_delete(on_delete: types.OnDeleteUpdateOption) -> String {
+  case on_delete {
+    types.Cascade -> " ON DELETE CASCADE"
+    types.NoAction -> ""
+    types.SetNull -> " ON DELETE SET NULL"
+  }
+}
+
+fn render_on_update(on_update: types.OnDeleteUpdateOption) -> String {
+  case on_update {
+    types.Cascade -> " ON UPDATE CASCADE"
+    types.NoAction -> ""
+    types.SetNull -> " ON UPDATE SET NULL"
+  }
 }
 
 fn field_type_to_db_type(t: types.ColumnType) -> String {
