@@ -1,6 +1,6 @@
+import gleam/dynamic
 import gleam/int
 import gleam/list
-import gleam/result
 import gleam/string
 import gleeunit/should
 import glitr/convert
@@ -126,6 +126,36 @@ pub type Date {
   Date(year: Int, month: Int, day: Int)
 }
 
+fn date_parse(v: String) -> Result(Date, List(dynamic.DecodeError)) {
+  case string.split(v, "/") {
+    [y, m, d, ..] -> {
+      use year <- result_guard(int.parse(y), [
+        dynamic.DecodeError("An integer", y, ["year"]),
+      ])
+      use month <- result_guard(int.parse(m), [
+        dynamic.DecodeError("An integer", m, ["month"]),
+      ])
+      use day <- result_guard(int.parse(d), [
+        dynamic.DecodeError("An integer", d, ["day"]),
+      ])
+
+      Ok(Date(year, month, day))
+    }
+    _ -> Error([dynamic.DecodeError("A string of format 'Y/M/D'", v, [])])
+  }
+}
+
+fn result_guard(
+  v: Result(a, _),
+  otherwise: b,
+  cb: fn(a) -> Result(c, b),
+) -> Result(c, b) {
+  case v {
+    Error(_) -> Error(otherwise)
+    Ok(value) -> cb(value)
+  }
+}
+
 pub fn converter_map_test() {
   // We are storing the date as a string for optimized memory storage
   let date_converter = {
@@ -134,17 +164,8 @@ pub fn converter_map_test() {
       fn(v: Date) {
         [v.year, v.month, v.day] |> list.map(int.to_string) |> string.join("/")
       },
-      fn(v: String) {
-        let elems =
-          string.split(v, "/")
-          |> list.map(fn(el) { int.parse(el) |> result.unwrap(-1) })
-        case elems {
-          [y, m, d, ..] -> Date(y, m, d)
-          [y, m] -> Date(y, m, -1)
-          [y] -> Date(y, -1, -1)
-          [] -> Date(-1, -1, -1)
-        }
-      },
+      date_parse,
+      Date(0, 0, 0),
     )
   }
 

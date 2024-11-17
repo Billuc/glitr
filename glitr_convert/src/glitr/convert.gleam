@@ -139,13 +139,12 @@ pub fn field(
       }
     },
     fields_def: {
-      let converter = next(field_type.default_value)
-      [#(field_name, field_type.type_def), ..converter.fields_def]
+      [
+        #(field_name, field_type.type_def),
+        ..next(field_type.default_value).fields_def
+      ]
     },
-    default_value: {
-      let converter = next(field_type.default_value)
-      converter.default_value
-    },
+    default_value: { next(field_type.default_value).default_value },
   )
 }
 
@@ -469,7 +468,9 @@ pub fn enum(
 pub fn map(
   converter: Converter(a),
   encode_map: fn(b) -> a,
-  decode_map: fn(a) -> b,
+  decode_map: fn(a) -> Result(b, List(dynamic.DecodeError)),
+  default_value: b,
+  // Kinda required until I find a more elegant way around this
 ) -> Converter(b) {
   Converter(
     fn(v: b) {
@@ -478,10 +479,10 @@ pub fn map(
     },
     fn(v: GlitrValue) {
       converter.decoder(v)
-      |> result.map(decode_map)
+      |> result.then(decode_map)
     },
     converter.type_def,
-    converter.default_value |> decode_map,
+    default_value,
   )
 }
 
