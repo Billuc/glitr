@@ -1,5 +1,7 @@
+import gleam/io
 import gleeunit
 import gleeunit/should
+import glitr/migrate/files
 
 pub fn main() {
   gleeunit.main()
@@ -9,4 +11,10 @@ pub fn main() {
 pub fn hello_world_test() {
   1
   |> should.equal(1)
+}
+
+pub fn get_migrations_test() {
+  use migrations <- files.get_migrations()
+  io.debug(migrations)
+  Ok(Nil)
 }

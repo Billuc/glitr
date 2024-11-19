@@ -1,0 +1,29 @@
+                        Table "public._migrations"
+  Column   |            Type             | Collation | Nullable | Default 
+-----------+-----------------------------+-----------+----------+---------
+ id        | integer                     |           | not null | 
+ name      | character varying(255)      |           | not null | 
+ appliedat | timestamp without time zone |           | not null | now()
+Indexes:
+    "_migrations_pkey" PRIMARY KEY, btree (id)
+
+   Index "public._migrations_pkey"
+ Column |  Type   | Key? | Definition 
+--------+---------+------+------------
+ id     | integer | yes  | id
+primary key, btree, for table "public._migrations"
+
+              Table "public.users"
+ Column | Type | Collation | Nullable | Default 
+--------+------+-----------+----------+---------
+ id     | uuid |           | not null | 
+ name   | text |           | not null | 
+Indexes:
+    "users_pkey" PRIMARY KEY, btree (id)
+
+     Index "public.users_pkey"
+ Column | Type | Key? | Definition 
+--------+------+------+------------
+ id     | uuid | yes  | id
+primary key, btree, for table "public.users"
+
