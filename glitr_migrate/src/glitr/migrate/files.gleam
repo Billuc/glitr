@@ -9,9 +9,13 @@ import simplifile
 
 const schema_file_path = "./sql.schema"
 
-pub fn get_migrations(
-  callback: fn(List(types.Migration)) -> Result(a, types.MigrateError),
-) -> Result(a, types.MigrateError) {
+const migration_up_guard = "--- migration:up"
+
+const migration_down_guard = "--- migration:down"
+
+const migration_end_guard = "--- migration:end"
+
+pub fn get_migrations() -> Result(List(types.Migration), types.MigrateError) {
   globlin.new_pattern("**/migrations/*.sql")
   |> result.replace_error(types.PatternError(
     "Something is wrong with the search pattern !",
@@ -33,7 +37,6 @@ pub fn get_migrations(
       #(_, errs) -> Error(types.CompoundError(errs))
     }
   })
-  |> result.try(callback)
 }
 
 fn read_migration_file(
@@ -55,7 +58,7 @@ fn read_migration_file(
   }
 }
 
-fn parse_file_name(path: String) -> Result(#(Int, String), Nil) {
+pub fn parse_file_name(path: String) -> Result(#(Int, String), Nil) {
   let filename = string.split(path, "/") |> list.last()
   use file <- result_guard(filename, Error(Nil))
 
@@ -66,20 +69,20 @@ fn parse_file_name(path: String) -> Result(#(Int, String), Nil) {
   Ok(#(num, num_and_name.1))
 }
 
-fn parse_migration_file(
+pub fn parse_migration_file(
   content: String,
 ) -> Result(#(List(String), List(String)), String) {
   use cut_migration_up <- result_guard(
-    string.split_once(content, "--- migration:up"),
-    Error("File badly formatted: '--- migration:up' not found !"),
+    string.split_once(content, migration_up_guard),
+    Error("File badly formatted: '" <> migration_up_guard <> "' not found !"),
   )
   use cut_migration_down <- result_guard(
-    string.split_once(cut_migration_up.1, "--- migration:down"),
-    Error("File badly formatted: '--- migration:down' not found !"),
+    string.split_once(cut_migration_up.1, migration_down_guard),
+    Error("File badly formatted: '" <> migration_down_guard <> "' not found !"),
   )
   use cut_end <- result_guard(
-    string.split_once(cut_migration_down.1, "---"),
-    Error("File badly formatted: '---' not found !"),
+    string.split_once(cut_migration_down.1, migration_end_guard),
+    Error("File badly formatted: '" <> migration_end_guard <> "' not found !"),
   )
 
   let queries_up = cut_migration_down.0 |> split_queries

@@ -6,4 +6,4 @@ CREATE TABLE users(
 --- migration:down
 DROP TABLE users;
 
----
+--- migration:end

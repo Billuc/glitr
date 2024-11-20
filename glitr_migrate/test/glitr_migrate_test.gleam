@@ -14,7 +14,7 @@ pub fn hello_world_test() {
 }
 
 pub fn get_migrations_test() {
-  use migrations <- files.get_migrations()
+  let migrations = files.get_migrations()
   io.debug(migrations)
   Ok(Nil)
 }
