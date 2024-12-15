@@ -13,6 +13,8 @@ pub type GlitrType {
   Bool
   Float
   Int
+  Dynamic
+  BitArray
   Null
   List(of: GlitrType)
   Dict(key: GlitrType, value: GlitrType)
@@ -20,7 +22,6 @@ pub type GlitrType {
   Optional(of: GlitrType)
   Result(result: GlitrType, error: GlitrType)
   Enum(variants: List(#(String, GlitrType)))
-  // Maybe add BitArray
 }
 
 /// This type is used to represent data values.  
@@ -31,6 +32,8 @@ pub type GlitrValue {
   BoolValue(value: Bool)
   FloatValue(value: Float)
   IntValue(value: Int)
+  DynamicValue(value: dynamic.Dynamic)
+  BitArrayValue(value: BitArray)
   NullValue
   ListValue(value: List(GlitrValue))
   DictValue(value: dict.Dict(GlitrValue, GlitrValue))
@@ -212,6 +215,38 @@ pub fn int() -> Converter(Int) {
     },
     Int,
     0,
+  )
+}
+
+/// Basic converter for Dynamic values
+pub fn dynamic() -> Converter(dynamic.Dynamic) {
+  Converter(
+    fn(v: dynamic.Dynamic) { DynamicValue(v) },
+    fn(v: GlitrValue) {
+      case v {
+        DynamicValue(val) -> Ok(val)
+        other ->
+          Error([dynamic.DecodeError("DynamicValue", get_type(other), [])])
+      }
+    },
+    Dynamic,
+    dynamic.from(Nil),
+  )
+}
+
+/// Basic converter for BitArray values
+pub fn bit_array() -> Converter(BitArray) {
+  Converter(
+    fn(v: BitArray) { BitArrayValue(v) },
+    fn(v: GlitrValue) {
+      case v {
+        BitArrayValue(val) -> Ok(val)
+        other ->
+          Error([dynamic.DecodeError("BitArrayValue", get_type(other), [])])
+      }
+    },
+    BitArray,
+    <<>>,
   )
 }
 
@@ -456,11 +491,10 @@ pub fn enum(
 ///     fn(v: String) { 
 ///       let elems = string.split(v, "/")
 ///       case elems {
-///         [y, m, d, ..] -> Date(y, m, d)
-///         [y, m]  -> Date(y, m, -1)
-///         [y] -> Date(y, -1, -1)
-///         [] -> Date(-1, -1, -1)
-///       }
+///         [y, m, d, ..] -> Ok(Date(y, m, d))
+///         _ -> Error([])
+///       },
+///       Date(0, 0, 0) // This is required for now...
 ///     }
 ///   )
 /// }
@@ -493,6 +527,8 @@ fn get_type(val: GlitrValue) -> String {
     EnumValue(_, _) -> "EnumValue"
     FloatValue(_) -> "FloatValue"
     IntValue(_) -> "IntValue"
+    DynamicValue(_) -> "DynamicValue"
+    BitArrayValue(_) -> "BitArrayValue"
     ListValue(_) -> "ListValue"
     NullValue -> "NullValue"
     ObjectValue(_) -> "ObjectValue"
