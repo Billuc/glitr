@@ -9,14 +9,14 @@ pub type User {
 pub fn select_test() {
   let user_converter =
     convert.object({
-      use name <- convert.parameter
-      use age <- convert.parameter
-      use <- convert.constructor
-      User(name:, age:)
+      use name <- convert.field(
+        "name",
+        fn(u: User) { Ok(u.name) },
+        convert.string(),
+      )
+      use age <- convert.field("age", fn(u: User) { Ok(u.age) }, convert.int())
+      convert.success(User(name:, age:))
     })
-    |> convert.field("name", fn(u) { Ok(u.name) }, convert.string())
-    |> convert.field("age", fn(u) { Ok(u.age) }, convert.int())
-    |> convert.to_converter
 
   sql.select("users", user_converter)
   |> should.equal("SELECT name, age FROM users;")

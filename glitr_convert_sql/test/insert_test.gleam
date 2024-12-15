@@ -9,14 +9,14 @@ pub type User {
 pub fn insert_test() {
   let user_converter =
     convert.object({
-      use name <- convert.parameter
-      use age <- convert.parameter
-      use <- convert.constructor
-      User(name:, age:)
+      use name <- convert.field(
+        "name",
+        fn(u: User) { Ok(u.name) },
+        convert.string(),
+      )
+      use age <- convert.field("age", fn(u: User) { Ok(u.age) }, convert.int())
+      convert.success(User(name:, age:))
     })
-    |> convert.field("name", fn(u) { Ok(u.name) }, convert.string())
-    |> convert.field("age", fn(u) { Ok(u.age) }, convert.int())
-    |> convert.to_converter
 
   let my_user = User("Georges", 1)
 
@@ -27,14 +27,14 @@ pub fn insert_test() {
 pub fn insert_multiple_test() {
   let user_converter =
     convert.object({
-      use name <- convert.parameter
-      use age <- convert.parameter
-      use <- convert.constructor
-      User(name:, age:)
+      use name <- convert.field(
+        "name",
+        fn(u: User) { Ok(u.name) },
+        convert.string(),
+      )
+      use age <- convert.field("age", fn(u: User) { Ok(u.age) }, convert.int())
+      convert.success(User(name:, age:))
     })
-    |> convert.field("name", fn(u) { Ok(u.name) }, convert.string())
-    |> convert.field("age", fn(u) { Ok(u.age) }, convert.int())
-    |> convert.to_converter
 
   let georges = User("Georges", 1)
   let nemo = User("Nemo", 23)

@@ -10,7 +10,7 @@ packages = [
   { name = "gleam_stdlib", version = "0.41.0", build_tools = ["gleam"], requirements = [], otp_app = "gleam_stdlib", source = "hex", outer_checksum = "1B2F80CB1B66B027E3198A2FF71EF3F2F31DF89ED97AD606F25FD387A4C3C1EF" },
   { name = "gleeunit", version = "1.2.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleeunit", source = "hex", outer_checksum = "F7A7228925D3EE7D0813C922E062BFD6D7E9310F0BEE585D3A42F3307E3CFD13" },
   { name = "glexer", version = "1.0.1", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "glexer", source = "hex", outer_checksum = "BD477AD657C2B637FEF75F2405FAEFFA533F277A74EF1A5E17B55B1178C228FB" },
-  { name = "glitr_convert", version = "0.2.2", build_tools = ["gleam"], requirements = ["gleam_json", "gleam_stdlib"], otp_app = "glitr_convert", source = "hex", outer_checksum = "9FC5613751AD86F592A7274B281AEF28396096C56B6DED8834DA8B3E9E244FAC" },
+  { name = "glitr_convert", version = "0.2.4", build_tools = ["gleam"], requirements = ["gleam_json", "gleam_stdlib"], otp_app = "glitr_convert", source = "hex", outer_checksum = "8C84731F004158C4C9A64E9C3E9BCCD4E9C9454B2CD692DA166CDEC0844C9A69" },
   { name = "shellout", version = "1.6.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "shellout", source = "hex", outer_checksum = "E2FCD18957F0E9F67E1F497FC9FF57393392F8A9BAEAEA4779541DE7A68DD7E0" },
   { name = "simplifile", version = "2.2.0", build_tools = ["gleam"], requirements = ["filepath", "gleam_stdlib"], otp_app = "simplifile", source = "hex", outer_checksum = "0DFABEF7DC7A9E2FF4BB27B108034E60C81BEBFCB7AB816B9E7E18ED4503ACD8" },
 ]
@@ -20,6 +20,6 @@ glance = { version = ">= 0.11.0 and < 1.0.0" }
 glance_printer = { version = ">= 1.2.1 and < 2.0.0" }
 gleam_stdlib = { version = ">= 0.34.0 and < 2.0.0" }
 gleeunit = { version = ">= 1.0.0 and < 2.0.0" }
-glitr_convert = { version = ">= 0.2.2 and < 1.0.0" }
+glitr_convert = { version = ">= 0.2.4 and < 1.0.0" }
 shellout = { version = ">= 1.6.0 and < 2.0.0" }
 simplifile = { version = ">= 2.2.0 and < 3.0.0" }

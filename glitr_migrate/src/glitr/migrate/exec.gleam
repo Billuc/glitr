@@ -78,10 +78,12 @@ fn exec_queries(
   case queries {
     [] -> Ok(Nil)
     [q, ..rest] -> {
-      io.println("Executing query : " <> q.sql)
-      io.print(" with values ")
-      io.debug(list.reverse(q.parameters))
-      io.println("")
+      // type pog.Query is opaque and no longer exposes its parts
+      
+      // io.println("Executing query : " <> q.sql)
+      // io.print(" with values ")
+      // io.debug(list.reverse(q.parameters))
+      // io.println("")
 
       let res = q |> pog.execute(conn)
       case res {
