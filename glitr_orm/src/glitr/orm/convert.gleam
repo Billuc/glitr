@@ -11,7 +11,11 @@ const time_sep = ":"
 
 pub fn date() -> convert.Converter(orm.Date) {
   convert.string()
-  |> convert.map(date_to_str, str_to_date)
+  |> convert.map(
+    date_to_str,
+    fn(str) { Ok(str_to_date(str)) },
+    orm.Date(year: -1, month: -1, day: -1),
+  )
 }
 
 fn date_to_str(v: orm.Date) -> String {
@@ -34,7 +38,11 @@ fn str_to_date(v: String) -> orm.Date {
 
 pub fn time() -> convert.Converter(orm.Time) {
   convert.string()
-  |> convert.map(time_to_str, str_to_time)
+  |> convert.map(
+    time_to_str,
+    fn(str) { Ok(str_to_time(str)) },
+    orm.Time(-1, -1, -1),
+  )
 }
 
 fn time_to_str(v: orm.Time) -> String {
@@ -68,6 +76,8 @@ pub fn timestamp() -> convert.Converter(orm.Timestamp) {
         [d] -> orm.Timestamp(str_to_date(d), orm.Time(-1, -1, -1))
         [] -> orm.Timestamp(orm.Date(-1, -1, -1), orm.Time(-1, -1, -1))
       }
+      |> Ok
     },
+    orm.Timestamp(date: orm.Date(-1, -1, -1), time: orm.Time(-1, -1, -1)),
   )
 }

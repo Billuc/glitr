@@ -10,8 +10,8 @@ import gleam/result
 import glitr/convert as c
 import glitr/convert/json as j
 
-/// Sets the columns and values of the Insert using the converter and the provided values.  
-/// If the converter isn't an Object converter, the value is left unchanged.  
+/// Sets the columns and values of the Insert using the converter and the provided values.
+/// If the converter isn't an Object converter, the value is left unchanged.
 /// This is because we don't have information about the fields/columns names otherwise.
 pub fn cake_insert(
   value: i.Insert(a),
@@ -33,8 +33,8 @@ pub fn cake_insert(
   }
 }
 
-/// Sets the column sets of the Update using the converter and the provided value.  
-/// If the converter isn't an Object converter, the value is left unchanged.  
+/// Sets the column sets of the Update using the converter and the provided value.
+/// If the converter isn't an Object converter, the value is left unchanged.
 /// This is because we don't have information about the fields/columns names otherwise.
 pub fn cake_update(
   value: u.Update(a),
@@ -52,7 +52,7 @@ pub fn cake_update(
   }
 }
 
-/// Sets the selected colums of the Select using the converter.  
+/// Sets the selected colums of the Select using the converter.
 /// If the converter isn't an Object converter, the value is left unchanged.
 /// This is because we don't have information about the fields/columns names otherwise.
 pub fn cake_select_fields(
@@ -187,5 +187,7 @@ fn type_as_str(of: c.GlitrType) -> String {
     c.Optional(_) -> "Optional"
     c.Result(_, _) -> "Result"
     c.String -> "String"
+    c.BitArray -> "BitArray"
+    c.Dynamic -> "Dynamic"
   }
 }
