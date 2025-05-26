@@ -1,9 +1,8 @@
 import gleam/dict
-import gleam/dynamic
+import gleam/dynamic/decode
 import gleam/json
 import gleam/list
 import gleam/result
-import gleam/string
 import glitr/convert as c
 
 /// Encode a value into the corresponding Json using the converter.  
@@ -13,14 +12,15 @@ pub fn json_encode(value: a, converter: c.Converter(a)) -> json.Json {
 }
 
 /// Decode a Json value using the provided converter.
-pub fn json_decode(
-  converter: c.Converter(a),
-) -> fn(dynamic.Dynamic) -> Result(a, List(dynamic.DecodeError)) {
-  fn(value) {
-    value
-    |> decode_value(c.type_def(converter))
-    |> result.then(c.decode(converter))
-  }
+pub fn json_decode(conv: c.Converter(a)) -> decode.Decoder(a) {
+  let zero = c.default_value(conv)
+
+  decode.then(decode_value(c.type_def(conv)), fn(glitr_val) {
+    case c.decode(conv)(glitr_val) {
+      Ok(v) -> decode.success(v)
+      Error(_es) -> decode.failure(zero, "Unable to decode GlitrValue")
+    }
+  })
 }
 
 /// Encode a GlitrValue into its corresponding JSON representation.  
@@ -65,107 +65,135 @@ pub fn encode_value(val: c.GlitrValue) -> json.Json {
 /// Decode a JSON value using the specified GlitrType as the shape of the data.  
 /// Returns the corresponding GlitrValue representation.
 /// This isn't meant to be used directly !
-pub fn decode_value(
-  of: c.GlitrType,
-) -> fn(dynamic.Dynamic) -> Result(c.GlitrValue, List(dynamic.DecodeError)) {
+pub fn decode_value(of: c.GlitrType) -> decode.Decoder(c.GlitrValue) {
   case of {
-    c.String -> fn(val) { val |> dynamic.string() |> result.map(c.StringValue) }
-    c.Bool -> fn(val) { val |> dynamic.bool() |> result.map(c.BoolValue) }
-    c.Float -> fn(val) { val |> dynamic.float() |> result.map(c.FloatValue) }
-    c.Int -> fn(val) { val |> dynamic.int() |> result.map(c.IntValue) }
-    c.List(el) -> fn(val) {
-      val
-      |> dynamic.list(dynamic.dynamic)
-      |> result.then(fn(val_list) {
-        list.fold(val_list, Ok([]), fn(result, list_el) {
-          case result, list_el |> decode_value(el) {
-            Ok(result_list), Ok(jval) -> Ok([jval, ..result_list])
-            Ok(_), Error(errs) | Error(errs), Ok(_) -> Error(errs)
-            Error(errs), Error(new_errs) -> Error(list.append(errs, new_errs))
-          }
-        })
-      })
-      |> result.map(list.reverse)
-      |> result.map(c.ListValue)
-    }
-    c.Dict(k, v) -> fn(val) {
-      val
-      |> dynamic.list(
-        of: dynamic.list(of: dynamic.any([decode_value(k), decode_value(v)])),
-      )
-      |> result.then(list.fold(
-        _,
-        Ok([]),
-        fn(result, el) {
-          case result, el {
-            Ok(vals), [first, second, ..] -> Ok([#(first, second), ..vals])
-            Ok(_), _ -> Error([dynamic.DecodeError("2 elements", "0 or 1", [])])
-            // TODO: better path
-            Error(errs), [_, _, ..] -> Error(errs)
-            Error(errs), _ ->
-              Error([dynamic.DecodeError("2 elements", "0 or 1", []), ..errs])
-          }
-        },
-      ))
-      |> result.map(dict.from_list)
-      |> result.map(c.DictValue)
-    }
-    c.Object(fields) -> fn(val) {
-      list.fold(fields, Ok([]), fn(result, f) {
-        case result, val |> dynamic.field(f.0, decode_value(f.1)) {
-          Ok(field_list), Ok(jval) -> Ok([#(f.0, jval), ..field_list])
-          Ok(_), Error(errs) | Error(errs), Ok(_) -> Error(errs)
-          Error(errs), Error(new_errs) -> Error(list.append(errs, new_errs))
+    c.String -> decode.map(decode.string, c.StringValue)
+    c.Bool -> decode.map(decode.bool, c.BoolValue)
+    c.Float -> decode.map(decode.float, c.FloatValue)
+    c.Int -> decode.map(decode.int, c.IntValue)
+    c.List(el) -> decode_list(el)
+    c.Dict(k, v) -> decode_dict(k, v)
+    c.Object(fs) -> decode_object(fs)
+    c.Optional(t) -> decode_optional(t)
+    c.Result(ok, err) -> decode_result(ok, err)
+    c.Enum(vars) -> decode_enum(vars)
+    // fallback for unknown type (should rarely happen)
+    _ -> decode.failure(c.NullValue, "Unsupported GlitrType")
+  }
+}
+
+fn decode_list(el: c.GlitrType) -> decode.Decoder(c.GlitrValue) {
+  // Decode a list of dynamics, then map each through decode_value(el)
+  decode.list(decode_value(el))
+  |> decode.map(c.ListValue)
+}
+
+pub fn decode_dict(
+  k: c.GlitrType,
+  v: c.GlitrType,
+) -> decode.Decoder(c.GlitrValue) {
+  decode.list(decode.list(decode.dynamic))
+  |> decode.then(fn(list_of_pairs) {
+    // Map and check each sublist
+    let result =
+      list.fold(list_of_pairs, Ok([]), fn(acc_result, el) {
+        case acc_result {
+          Error(errs_acc) -> Error(errs_acc)
+          Ok(accum) ->
+            case el {
+              [key_dyn, val_dyn] ->
+                case
+                  decode.run(key_dyn, decode_value(k)),
+                  decode.run(val_dyn, decode_value(v))
+                {
+                  Ok(key), Ok(val) -> Ok([#(key, val), ..accum])
+                  Error(errs_k), Error(errs_v) ->
+                    Error(list.append(errs_k, errs_v))
+                  Error(errs), _ -> Error(errs)
+                  _, Error(errs) -> Error(errs)
+                }
+              _ ->
+                Error([decode.DecodeError("2 elements", "not a tuple of 2", [])])
+            }
         }
       })
       |> result.map(list.reverse)
-      |> result.map(c.ObjectValue)
+    // Now wrap as a decoder result:
+    case result {
+      Ok(pairs) -> decode.success(c.DictValue(dict.from_list(pairs)))
+      Error(_errs) -> decode.failure(c.DictValue(dict.new()), "Dict: errors")
+      // collapse_errors? or propagate somehow
     }
-    c.Optional(of) -> fn(val) {
-      val |> dynamic.optional(decode_value(of)) |> result.map(c.OptionalValue)
-    }
-    c.Result(res, err) -> fn(val) {
-      use type_val <- result.try(val |> dynamic.field("type", dynamic.string))
+  })
+}
 
-      case type_val {
-        "ok" ->
-          val
-          |> dynamic.field("value", decode_value(res))
-          |> result.map(Ok)
-          |> result.map(c.ResultValue)
-        "error" ->
-          val
-          |> dynamic.field("value", decode_value(err))
-          |> result.map(Error)
-          |> result.map(c.ResultValue)
-        other ->
-          Error([dynamic.DecodeError("'ok' or 'error'", other, ["type"])])
-        // TODO : better path
-      }
-    }
-    c.Enum(variants) -> fn(val) {
-      use variant_name <- result.try(
-        val |> dynamic.field("variant", dynamic.string),
-      )
-      use variant_def <- result.try(
-        list.key_find(variants, variant_name)
-        |> result.replace_error([
-          dynamic.DecodeError(
-            "One of: "
-              <> variants |> list.map(fn(v) { v.0 }) |> string.join("/"),
-            variant_name,
-            ["variant"],
-          ),
-        ]),
-      )
-      use variant_value <- result.try(
-        val
-        |> dynamic.field("value", dynamic.dynamic)
-        |> result.then(decode_value(variant_def)),
-      )
-
-      Ok(c.EnumValue(variant_name, variant_value))
-    }
-    _ -> fn(_val) { Ok(c.NullValue) }
+fn build_object_decoder(
+  fields: List(#(String, c.GlitrType)),
+  accum: List(#(String, c.GlitrValue)),
+) -> decode.Decoder(List(#(String, c.GlitrValue))) {
+  case fields {
+    [] -> decode.success(list.reverse(accum))
+    [#(field_name, field_type), ..rest] ->
+      decode.field(field_name, decode_value(field_type), fn(field_val) {
+        build_object_decoder(rest, [#(field_name, field_val), ..accum])
+      })
   }
+}
+
+// Public entrypoint
+pub fn decode_object(
+  fields: List(#(String, c.GlitrType)),
+) -> decode.Decoder(c.GlitrValue) {
+  build_object_decoder(fields, [])
+  |> decode.map(c.ObjectValue)
+}
+
+pub fn decode_optional(t: c.GlitrType) -> decode.Decoder(c.GlitrValue) {
+  decode.optional(decode_value(t))
+  |> decode.map(c.OptionalValue)
+}
+
+pub fn decode_result(
+  ok: c.GlitrType,
+  err: c.GlitrType,
+) -> decode.Decoder(c.GlitrValue) {
+  // Compose the decoder with Gleam's "do-notation"
+  decode.field("type", decode.string, fn(result_type) {
+    case result_type {
+      "ok" ->
+        decode.field("value", decode_value(ok), fn(val) {
+          decode.success(c.ResultValue(Ok(val)))
+        })
+      "error" ->
+        decode.field("value", decode_value(err), fn(val) {
+          decode.success(c.ResultValue(Error(val)))
+        })
+      other ->
+        decode.failure(
+          c.NullValue,
+          "'type' must be 'ok' or 'error', found: " <> other,
+        )
+    }
+  })
+}
+
+pub fn decode_enum(
+  variants: List(#(String, c.GlitrType)),
+) -> decode.Decoder(c.GlitrValue) {
+  // 1. Decode the "variant" tag
+  decode.field("variant", decode.string, fn(variant_name) {
+    // 2. Look up the tag in the compile-time list
+    case list.key_find(variants, variant_name) {
+      Ok(var_type) ->
+        // 3. Decode the corresponding "value" field
+        decode.field("value", decode_value(var_type), fn(payload) {
+          decode.success(c.EnumValue(variant_name, payload))
+        })
+      Error(_) ->
+        decode.failure(
+          c.NullValue,
+          "Unknown enum variant: \"" <> variant_name <> "\"",
+        )
+    }
+  })
 }

@@ -1,4 +1,4 @@
-import gleam/dynamic
+import gleam/dynamic/decode
 import gleam/int
 import gleam/list
 import gleam/string
@@ -126,22 +126,22 @@ pub type Date {
   Date(year: Int, month: Int, day: Int)
 }
 
-fn date_parse(v: String) -> Result(Date, List(dynamic.DecodeError)) {
+fn date_parse(v: String) -> Result(Date, List(decode.DecodeError)) {
   case string.split(v, "/") {
     [y, m, d, ..] -> {
       use year <- result_guard(int.parse(y), [
-        dynamic.DecodeError("An integer", y, ["year"]),
+        decode.DecodeError("An integer", y, ["year"]),
       ])
       use month <- result_guard(int.parse(m), [
-        dynamic.DecodeError("An integer", m, ["month"]),
+        decode.DecodeError("An integer", m, ["month"]),
       ])
       use day <- result_guard(int.parse(d), [
-        dynamic.DecodeError("An integer", d, ["day"]),
+        decode.DecodeError("An integer", d, ["day"]),
       ])
 
       Ok(Date(year, month, day))
     }
-    _ -> Error([dynamic.DecodeError("A string of format 'Y/M/D'", v, [])])
+    _ -> Error([decode.DecodeError("A string of format 'Y/M/D'", v, [])])
   }
 }
 
