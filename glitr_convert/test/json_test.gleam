@@ -15,7 +15,10 @@ pub fn simple_object_decode_test() {
       c.success(TestType(a, b))
     })
 
-  json.decode("{\"a\": \"Age\", \"b\": 28}", j.json_decode(test_converter))
+  json.parse(
+    from: "{\"a\": \"Age\", \"b\": 28}",
+    using: j.json_decode(test_converter),
+  )
   |> should.be_ok
   |> should.equal(TestType("Age", 28))
 }
@@ -59,7 +62,7 @@ pub fn complex_type_decode_test() {
       c.success(ComplexType(first:, second:))
     })
 
-  json.decode(
+  json.parse(
     "{
     \"first\": [\"hello\", \"World\"],
     \"second\": {
@@ -178,7 +181,7 @@ pub fn enum_decode_test() {
       ],
     )
 
-  json.decode(
+  json.parse(
     "{
       \"variant\": \"VariantA\",
       \"value\": {\"msg\": \"foo\"}
@@ -188,7 +191,7 @@ pub fn enum_decode_test() {
   |> should.be_ok
   |> should.equal(VariantA("foo"))
 
-  json.decode(
+  json.parse(
     "{
       \"variant\": \"VariantB\",
       \"value\": {\"msg\": \"bar\"}
@@ -198,7 +201,7 @@ pub fn enum_decode_test() {
   |> should.be_ok
   |> should.equal(VariantB("bar"))
 
-  json.decode(
+  json.parse(
     "{
       \"variant\": \"VariantC\",
       \"value\": {\"age\": 21}
